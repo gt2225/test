@@ -1,0 +1,3343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Place-based Data Collection Tool</title>
+  <style>
+    :root {
+      --bg: #fff;
+      --panel: #fff;
+      --ink: #16302b;
+      --mute: #5b706b;
+      --line: #c9d8d4;
+      --step-bg: #e4f1fa;
+      --step-line: #b5d2e5;
+      --accent: #1d6b84;
+      --accent-ink: #fff;
+      --danger: #a33a2c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      flex-shrink: 0;
+      width: 100%;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 10px 24px 0;
+      overflow-y: auto;
+      max-height: 30vh;
+    }
+
+    h1 {
+      font: 700 26px/1.2 Georgia, "Times New Roman", serif;
+      margin: 0;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--mute);
+      max-width: 70ch;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: var(--leftW, 600px) 18px minmax(0, 1fr);
+      gap: 0;
+      max-width: 1300px;
+      flex: 1 1 0;
+      width: 100%;
+      min-height: 0;
+      margin: 0 auto;
+      padding: 8px 24px 20px;
+      align-items: stretch;
+      overflow: hidden;
+    }
+
+    aside {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+      height: 100%;
+      overflow-y: scroll !important;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+      padding: 0 6px 16px 0;
+    }
+
+    /* Fade at the bottom edge signals more content below (works in all browsers) */
+    aside::after {
+      content: "";
+      display: block;
+      flex-shrink: 0;
+      position: sticky;
+      bottom: -16px;
+      height: 36px;
+      margin-top: -48px;
+      pointer-events: none;
+      background: linear-gradient(rgba(255, 244, 179, 0), #c1c1c1 85%);
+      transition: opacity .2s;
+    }
+
+    aside.at-end::after {
+      opacity: 0;
+    }
+
+    aside::-webkit-scrollbar {
+      width: 12px;
+    }
+
+    aside::-webkit-scrollbar-track {
+      background: #e8efed;
+      border-radius: 6px;
+    }
+
+    aside::-webkit-scrollbar-thumb {
+      background: #78918b;
+      border: 2px solid #e8efed;
+      border-radius: 6px;
+    }
+
+    aside::-webkit-scrollbar-thumb:hover {
+      background: #1d6b84;
+    }
+
+    /* Wrapper takes the grid column; #preview inside it is shrunk to the
+       page's width (see applyZoom) so there is no empty grey space beside the page. */
+    #previewWrap {
+      display: flex;
+      justify-content: center;
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+    }
+
+    #preview {
+      display: flex;
+      flex-direction: column;
+      flex: 0 0 auto;
+      width: 100%;
+      max-width: 100%;
+      min-width: min(100%, 320px);
+      min-height: 0;
+      height: 100%;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #zoomBar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #f4f8f7;
+    }
+
+    #zoomBar button {
+      padding: 4px 10px;
+      min-width: 34px;
+      background: #fff;
+      color: var(--accent);
+    }
+
+    #zoomBar button.active {
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    #zoomLabel {
+      min-width: 52px;
+      text-align: center;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      color: var(--mute);
+    }
+
+    #zoomBar .spacer {
+      flex: 1;
+    }
+
+    #zoomBar .tip {
+      font-size: 12px;
+      color: var(--mute);
+    }
+
+    #stage {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      padding: 12px;
+      overflow: auto;
+      overscroll-behavior: contain;
+      background: #e8efed;
+      display: flex;
+    }
+
+    /* margin:auto centers the page when it is smaller than the pane,
+       and still lets it scroll from the top-left when it is larger */
+    #stage .canvas-container {
+      flex-shrink: 0;
+      margin: auto;
+      box-shadow: 0 2px 14px rgba(0, 0, 0, .28);
+    }
+
+    section,
+    details.step {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      flex-shrink: 0;
+    }
+
+    /* each numbered step gets a light blue box */
+    details.step {
+      background: var(--step-bg);
+      border-color: var(--step-line);
+    }
+
+    /* field configuration on the left, live box preview on the right (wraps below when the pane is narrow) */
+    .cfg-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 18px;
+      align-items: flex-start;
+    }
+
+    .cfg-main,
+    .cfg-preview {
+      flex: 1 1 250px;
+      min-width: 0;
+    }
+
+    .cfg-preview {
+      position: sticky;
+      top: 0;
+    }
+
+    .sub {
+      font: 600 13px/1.3 system-ui, sans-serif;
+      margin: 16px 0 2px;
+      padding-top: 12px;
+      border-top: 1px solid var(--step-line);
+    }
+
+    .sub.first {
+      margin-top: 8px;
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    /* draggable divider between the left and right panes */
+    #splitter {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: col-resize;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #splitter::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      margin-left: -1px;
+      background: var(--line);
+      transition: background .15s;
+    }
+
+    #splitter::after {
+      content: "";
+      position: relative;
+      width: 6px;
+      height: 44px;
+      border-radius: 3px;
+      background: #8aa39d;
+      border: 1px solid #fff;
+      transition: background .15s;
+    }
+
+    #splitter:hover::before,
+    #splitter:hover::after,
+    #splitter.dragging::before,
+    #splitter.dragging::after,
+    #splitter:focus-visible::before,
+    #splitter:focus-visible::after {
+      background: var(--accent);
+    }
+
+    body.resizing {
+      cursor: col-resize;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    h2 {
+      font: 600 15px/1.3 system-ui, sans-serif;
+      margin: 0 0 8px;
+    }
+
+    details.step > summary {
+      font: 600 15px/1.3 system-ui, sans-serif;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+    }
+
+    details.step > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details.step > summary {
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+
+    /* round accent badge with a chevron: clearly a toggle */
+    details.step > summary::after {
+      content: "";
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 18px no-repeat;
+      transition: transform .2s;
+    }
+
+    details.step > summary:hover::after {
+      filter: brightness(1.15);
+    }
+
+    details.step[open] > summary::after {
+      transform: rotate(180deg);
+    }
+
+    details.step[open] > summary {
+      margin-bottom: 8px;
+    }
+
+    .chk-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      margin-bottom: 10px;
+    }
+
+    .chk {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    label.f {
+      display: block;
+      font-size: 13px;
+      color: var(--mute);
+      margin: 8px 0 2px;
+    }
+
+    input[type=text],
+    select {
+      width: 100%;
+      min-width: 0;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      font: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    input[type=file] {
+      max-width: 100%;
+    }
+
+    button {
+      font: inherit;
+      padding: 7px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: var(--accent-ink);
+      cursor: pointer;
+    }
+
+    button:hover {
+      filter: brightness(1.12);
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 3px solid #7fc4d8;
+      outline-offset: 1px;
+    }
+
+    .row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+      min-width: 0;
+    }
+
+    .row input {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .row button {
+      padding: 4px 10px;
+      flex-shrink: 0;
+    }
+
+    .row.sel input {
+      border-color: var(--accent);
+      background: #eef6f9;
+    }
+
+    .two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btns {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: var(--mute);
+      margin: 6px 0 0;
+    }
+
+    #boxPreview {
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      margin: 8px 0;
+      overflow: hidden;
+    }
+
+    #boxPreview svg {
+      display: block;
+      width: 100%;
+      max-height: 280px;
+    }
+
+    #sel {
+      display: none;
+    }
+
+    .label-help {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 8px 0 2px;
+    }
+
+    .label-help label.f {
+      margin: 0;
+    }
+
+    button.help-btn {
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      color: var(--accent);
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--accent);
+    }
+
+    /* ---------- crop modal ---------- */
+    #cropModal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 25, 22, .6);
+      padding: 16px;
+    }
+
+    #cropModal[hidden] {
+      display: none;
+    }
+
+    .cm-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 20px;
+      max-width: 1140px;
+      max-height: 96vh;
+      overflow: auto;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, .4);
+    }
+
+    .cm-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 8px 0;
+    }
+
+    .cm-tools select {
+      width: auto;
+    }
+
+    #cropInfo {
+      color: var(--mute);
+      font-size: 13px;
+      margin-left: auto;
+    }
+
+    #cropWork {
+      display: flex;
+      justify-content: center;
+      background: #e8efed;
+      border-radius: 6px;
+      padding: 10px;
+    }
+
+    #cropFrame {
+      position: relative;
+      flex-shrink: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    #cropImg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+
+    #cropBox {
+      position: absolute;
+      border: 2px solid #fff;
+      outline: 1px solid var(--accent);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, .55);
+      cursor: move;
+      touch-action: none;
+    }
+
+    #cropBox i {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border: 2px solid #fff;
+      border-radius: 3px;
+      touch-action: none;
+    }
+
+    #cropBox i[data-h=nw] { left: -8px; top: -8px; cursor: nwse-resize; }
+    #cropBox i[data-h=ne] { right: -8px; top: -8px; cursor: nesw-resize; }
+    #cropBox i[data-h=sw] { left: -8px; bottom: -8px; cursor: nesw-resize; }
+    #cropBox i[data-h=se] { right: -8px; bottom: -8px; cursor: nwse-resize; }
+    #cropBox i[data-h=n] { left: calc(50% - 7px); top: -8px; cursor: ns-resize; }
+    #cropBox i[data-h=s] { left: calc(50% - 7px); bottom: -8px; cursor: ns-resize; }
+    #cropBox i[data-h=w] { top: calc(50% - 7px); left: -8px; cursor: ew-resize; }
+    #cropBox i[data-h=e] { top: calc(50% - 7px); right: -8px; cursor: ew-resize; }
+
+    @media (max-width: 860px) {
+      body {
+        overflow: auto;
+        display: block;
+        height: auto;
+      }
+
+      header {
+        max-height: none;
+        padding: 16px;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+        padding: 12px 16px 24px;
+        gap: 16px;
+      }
+
+      aside {
+        height: auto;
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+      }
+
+      #splitter {
+        display: none;
+      }
+
+      #previewWrap {
+        height: 75vh;
+        min-height: 300px;
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      h1 {
+        font-size: 22px;
+      }
+
+      header {
+        padding: 12px 14px;
+      }
+
+      main {
+        padding: 10px 12px 20px;
+      }
+
+      section,
+      details.step {
+        padding: 12px;
+      }
+
+      .two {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Place-based Data Collection Tool</h1>
+    <p id="imgNotice" class="hint" style="color: var(--danger)" hidden></p>
+  </header>
+
+  <main>
+    <aside>
+      <details class="step" data-step="open_project">
+        <summary>Optional: Open a saved project</summary>
+        <p class="hint">Continue a worksheet you saved earlier, or skip this and start a new one with step 1.</p>
+        <button id="loadBtn">Open Project</button>
+        <input type="file" id="loadFile" accept=".json" hidden>
+      </details>
+
+      <details class="step" data-step="layout_map">
+        <summary>1. Configure the Page Layout and Map</summary>
+        <label class="f" for="title">Worksheet Title</label>
+        <input type="text" id="title" placeholder="Add Worksheet Title here">
+
+        <label class="f" for="orient">Orientation</label>
+        <select id="orient">
+          <option value="landscape">Landscape</option>
+          <option value="portrait">Portrait</option>
+        </select>
+
+        <div class="label-help">
+          <label class="f" for="mapFile">Map Image</label>
+          <button type="button" id="mapHelpBtn" class="help-btn" aria-label="Help: Map Image" aria-expanded="false" aria-controls="mapHelpText" title="Don't have one? Search and grab the location from your favorite Maps app and upload the image here">?</button>
+        </div>
+        <p id="mapHelpText" class="hint" hidden>Don't have one? Search and grab the location from your favorite Maps app and upload the image here.</p>
+        <input type="file" id="mapFile" accept="image/*">
+        <div id="saturationControl" style="display:none; margin-top:12px;">
+        <label for="mapSaturation" class="f">
+          <strong>Map Color Saturation:</strong>
+          <span id="saturationValue">100%</span>
+        </label>
+
+  <input
+    type="range"
+    id="mapSaturation"
+    min="0"
+    max="100"
+    value="100"
+    step="1"
+    style="width:100%; cursor:pointer;"
+  >
+
+  <div style="display:flex; justify-content:space-between; font-size:12px;">
+    <span>Black &amp; White</span>
+    <span>Original Color</span>
+  </div>
+</div>
+
+        <div id="mapEditControls" style="display:none; margin-top:14px;">
+          <label class="f"><strong>Rotate Map</strong></label>
+          <div class="btns" style="margin-top:0; margin-bottom:12px;">
+            <button type="button" class="secondary" data-xform="ccw" title="Rotate 90&deg; counter-clockwise" aria-label="Rotate left 90 degrees">&#8634; Rotate Left</button>
+            <button type="button" class="secondary" data-xform="cw" title="Rotate 90&deg; clockwise" aria-label="Rotate right 90 degrees">&#8635; Rotate Right</button>
+          </div>
+          <p class="hint" style="margin-top:-6px; margin-bottom:12px;">Stops and arrows stay on the same spots on the map.</p>
+
+          <button id="cropBtn" type="button">Crop Map</button>
+          <p class="hint" id="cropStatus">Showing the full map image.</p>
+
+          <label for="mapScale" class="f">
+            <strong>Map Size on Page:</strong>
+            <span id="mapScaleValue">100%</span>
+          </label>
+          <input type="range" id="mapScale" min="30" max="100" value="100" step="1"
+            style="width:100%; cursor:pointer;">
+          <div style="display:flex; justify-content:space-between; font-size:12px;">
+            <span>Smaller</span>
+            <span>Fill the page</span>
+          </div>
+        </div>
+      </details>
+
+      <details class="step" data-step="stop_data">
+        <summary>2. Specify stop data and place stops on the map</summary>
+        <div class="cfg-row">
+        <div class="cfg-main">
+        <h3 class="sub first">Data to collect at each stop</h3>
+        <p class="hint">Each field becomes a label with a blank line.</p>
+
+        <label class="f">Recommended Fields for AQI data</label>
+        <div id="recommendedFields" class="chk-row" role="group" aria-label="Recommended fields for AQI data"></div>
+
+        <label class="f">Custom Fields</label>
+        <div id="fieldList"></div>
+        <div class="btns">
+          <button id="addField">Add a new Data Field</button>
+          <button id="updateAllStops" type="button" class="secondary" title="Apply the current Data Fields and checkbox labels to every stop box on the map">Update all stop boxes</button>
+        </div>
+        <p class="hint">Click “Update all stop boxes” to apply field changes to existing stops. New stops always use the current fields.</p>
+
+        <h3 class="sub">Checkbox labels</h3>
+        <div class="two">
+          <div>
+            <label class="f" for="indoorLabel">First checkbox</label>
+            <input type="text" id="indoorLabel" value="Indoor">
+          </div>
+          <div>
+            <label class="f" for="outdoorLabel">Second checkbox</label>
+            <input type="text" id="outdoorLabel" value="Outdoor">
+          </div>
+        </div>
+
+        </div>
+
+        <div class="cfg-preview">
+          <h3 class="sub first">Stop box preview</h3>
+          <div id="boxPreview" aria-live="polite"></div>
+        </div>
+        </div>
+
+        <h3 class="sub">Stops on the map</h3>
+        <p class="hint"><strong>Right-click the map</strong> at a stop's location to add its data box with the arrow pointing there (or use the button below). Click a stop name to select it. Drag the box where there is room, and drag the arrowhead to fine-tune the spot.</p>
+        <div class="btns">
+          <button id="addStop">Add a new Stop</button>
+        </div>
+
+        <div id="stopList" style="margin-top:10px;"></div>
+
+        <div id="sel">
+          <label class="f">
+            <input type="checkbox" id="arrowOn" checked>
+            Show arrow to map location for the selected stop
+          </label>
+        </div>
+      </details>
+
+      <details class="step" data-step="instructions">
+        <summary>3. Optional: Add instructions and arrange the page</summary>
+        <p class="hint">Add text boxes with instructions for students, and move or resize the map to make room for them. Skip this step if you don't need it.</p>
+
+        <h3 class="sub first">Instruction text boxes</h3>
+        <div class="btns">
+          <button id="addNote" type="button">Add a text box</button>
+        </div>
+        <p class="hint">Drag a box to move it, drag its corners to resize it, and double-click it to edit the text. Add as many as you need.</p>
+        <div id="noteSel" style="display:none; margin-top:8px;">
+          <label class="f" for="noteSize">Text size for the selected box</label>
+          <select id="noteSize">
+            <option value="9">Small (9)</option>
+            <option value="11">Medium (11)</option>
+            <option value="13">Large (13)</option>
+            <option value="16">Extra large (16)</option>
+          </select>
+          <label class="f" for="noteBg">Box color</label>
+          <input type="color" id="noteBg" value="#ffffff" style="width:60px; height:30px; padding:0; cursor:pointer;">
+          <div class="btns">
+            <button id="noteDup" type="button" class="secondary">Duplicate</button>
+            <button id="noteDel" type="button" class="secondary">Delete</button>
+          </div>
+        </div>
+
+        <h3 class="sub">Map position</h3>
+        <label class="f">
+          <input type="checkbox" id="mapEditOn">
+          Move and resize the map
+        </label>
+        <p class="hint">When checked, drag the map to move it and drag a corner to resize it. Stops and arrows move with the map. Uncheck it to go back to placing stops.</p>
+        <div class="btns">
+          <button id="mapReset" type="button" class="secondary">Reset map position</button>
+        </div>
+      </details>
+
+      <details class="step" data-step="export">
+        <summary>4. Download assets or Save draft</summary>
+        <p class="hint">"Save Project" downloads a file you can reopen later to continue editing.</p>
+        <div class="btns">
+          <button id="pdf">Download PDF</button>
+          <button id="datasetTemplate">Download Dataset Template</button>
+          <button id="save">Save Project</button>
+        </div>
+      </details>
+    </aside>
+
+    <div id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize left and right panes"
+      tabindex="0" title="Drag to resize (double-click to reset)"></div>
+
+    <div id="previewWrap">
+    <div id="preview">
+      <div id="zoomBar" role="toolbar" aria-label="Preview zoom controls">
+        <button id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out">&minus;</button>
+        <span id="zoomLabel" aria-live="polite">100%</span>
+        <button id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+        <button id="zoomFitBtn" type="button" class="active" title="Fit the whole page in the preview">Fit to page</button>
+        <button id="zoom100" type="button" title="Actual size">100%</button>
+        <span class="spacer"></span>
+        <span class="tip">Ctrl/&#8984; + scroll to zoom</span>
+      </div>
+      <div id="stage">
+        <canvas id="c"></canvas>
+      </div>
+    </div>
+    </div>
+  </main>
+
+  <div id="cropModal" role="dialog" aria-modal="true" aria-labelledby="cropTitle" hidden>
+    <div class="cm-card">
+      <h2 id="cropTitle">Crop Map</h2>
+      <p class="hint">Drag the box to move it and drag its handles to resize it. Everything outside the box is removed from the map on the worksheet.</p>
+
+      <div class="cm-tools">
+        <label for="cropRatio">Shape:</label>
+        <select id="cropRatio">
+          <option value="free">Free</option>
+          <option value="page">Match the page's map area</option>
+          <option value="1">Square (1:1)</option>
+          <option value="1.3333">4:3</option>
+          <option value="1.7778">16:9</option>
+        </select>
+        <span id="cropInfo" aria-live="polite"></span>
+      </div>
+
+      <div id="cropWork">
+        <div id="cropFrame">
+          <img id="cropImg" alt="Map image to crop">
+          <div id="cropBox">
+            <i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i>
+            <i data-h="w"></i><i data-h="e"></i>
+            <i data-h="sw"></i><i data-h="s"></i><i data-h="se"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="cropApply" type="button">Apply Crop</button>
+        <button id="cropReset" type="button" class="secondary">Select Full Image</button>
+        <button id="cropCancel" type="button" class="secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+
+  <script>
+    /* ---------- fixed page template ---------- */
+    const TEMPLATE = {
+      // All images go side by side in the footer at the bottom of the worksheet, left to right in this order.
+      // Add more file names to this list to add more images.
+      footerImages: ['assets/logo-contaqt.png', 'assets/license.png', 'assets/logo-tiles.png'],
+      footerMaxHeight: 15,
+      imageGap: 8,
+      fullBleed: false
+    };
+
+    const $ = id => document.getElementById(id);
+
+    // Worksheet name with spaces turned into hyphens, for exported file names.
+    function fileSlug() {
+      return $('title').value
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .slice(0, 100) || 'Campus-Tour-Worksheet';
+    }
+    const FONT = 'Helvetica, Arial, sans-serif';
+    const PAPER = { letter: [612, 792] };
+    const M = 20;
+    const FREEZE = { selectable: false, evented: false };
+    const ARROW = '#000000';
+
+    // Fields offered as checkboxes in step 2.
+    const RECOMMENDED_FIELDS = [
+      'AQI',
+      'AQS',
+      'Temperature',
+      'Step Count',
+      'Timestamp',
+      'Interesting Data'
+    ];
+
+    // Recommended fields that are checked by default in every new worksheet.
+    const DEFAULT_FIELDS = [
+      'AQI',
+      'AQS',
+      'Temperature',
+      'Step Count',
+      'Timestamp'
+    ];
+
+    let PW = 792, PH = 612, AREA = null;
+    let fixedObjs = [], mapObj = null, mapData = null;
+    // mapOriginal = uncropped image, mapCrop = crop region in its pixels (null = full), mapScale = % of page map area
+    let mapOriginal = null, mapCrop = null, mapScale = 100;
+    // mapOff = how far the user has moved the map from its default centered spot (page px); mapEdit = map is draggable
+    let mapOff = { x: 0, y: 0 }, mapEdit = false, lastMapRect = null;
+    let footerEls = [], placeholder = null, lastSid = 0;
+
+    // Checked recommended fields + user-added custom fields.
+    let recChecked = new Set(DEFAULT_FIELDS);
+    let customFields = [];
+
+    // Combined field list: checked recommended fields (in order), then custom fields.
+    function getFields() {
+      const recs = RECOMMENDED_FIELDS.filter(f => recChecked.has(f));
+      return [...recs, ...customFields.filter(f => !recs.includes(f.trim()))];
+    }
+
+    const cv = new fabric.Canvas('c', {
+      preserveObjectStacking: true,
+      selection: false,
+      backgroundColor: '#ffffff'
+    });
+
+    function calcPage() {
+      const p = PAPER.letter;
+      const land = $('orient').value === 'landscape';
+
+      PW = land ? p[1] : p[0];
+      PH = land ? p[0] : p[1];
+    }
+
+    const mapRect = () => mapObj
+      ? {
+          l: mapObj.left,
+          t: mapObj.top,
+          w: mapObj.width * mapObj.scaleX,
+          h: mapObj.height * mapObj.scaleY
+        }
+      : AREA;
+
+    function layout() {
+      fixedObjs.forEach(o => cv.remove(o));
+      fixedObjs = [];
+
+      const add = o => {
+        o.set(FREEZE);
+        cv.add(o);
+        cv.sendToBack(o);
+        fixedObjs.push(o);
+        return o;
+      };
+
+      const GAP = TEMPLATE.imageGap;
+      const bleed = TEMPLATE.fullBleed;
+      const x0 = bleed ? 0 : M;
+      const bw = PW - 2 * x0;
+      const bandTop = bleed ? 0 : M;
+      const bandBottom = bleed ? PH : PH - 5;
+
+      const band = (els, maxH) => {
+        if (!els.length) return { h: 0, put: () => {} };
+
+        const ar = els.map(el =>
+          (el.naturalWidth || el.width) / (el.naturalHeight || el.height)
+        );
+        const sum = ar.reduce((a, b) => a + b, 0);
+        const h = Math.min(maxH, (bw - GAP * (els.length - 1)) / sum);
+        const rowW = sum * h + GAP * (els.length - 1);
+
+        return {
+          h,
+          put: top => {
+            let x = x0 + (bw - rowW) / 2;
+            els.forEach((el, i) => {
+              const im = new fabric.Image(el);
+              im.scaleToHeight(h);
+              im.set({ left: x, top });
+              add(im);
+              x += ar[i] * h + GAP;
+            });
+          }
+        };
+      };
+
+      const hb = band(footerEls, TEMPLATE.footerMaxHeight);
+
+      // images sit in a band along the bottom of the worksheet
+      hb.put(bandBottom - hb.h);
+
+      // title row starts at the top of the page
+      const ty = M;
+
+      const nd = add(new fabric.Text(
+        'Name: __________________________________________   Date: ____________',
+        {
+          fontSize: 11,
+          fontFamily: FONT,
+          fill: '#111',
+          originX: 'right',
+          left: PW - M
+        }
+      ));
+
+      const tt = add(new fabric.Textbox(
+        $('title').value || ' ',
+        {
+          fontSize: 18,
+          fontWeight: 'bold',
+          fontFamily: FONT,
+          fill: '#111',
+          left: M,
+          top: ty,
+          width: Math.max(80, PW - 2 * M - nd.getScaledWidth() - 16)
+        }
+      ));
+
+      nd.set('top', ty + (tt.height - nd.getScaledHeight()) / 2);
+
+      const ruleY = ty + tt.height + 8;
+
+      add(new fabric.Line([M, ruleY, PW - M, ruleY], {
+        stroke: '#999',
+        strokeWidth: 0.75
+      }));
+
+      AREA = {
+        l: M,
+        t: ruleY + 8,
+        w: PW - 2 * M,
+        h: bandBottom - hb.h - (hb.h ? 12 : 0) - (ruleY + 8)
+      };
+
+      placeholder = null;
+
+      if (mapObj) {
+        const s = Math.min(AREA.w / mapObj.width, AREA.h / mapObj.height) * (mapScale / 100);
+        mapObj.set({
+          scaleX: s,
+          scaleY: s,
+          left: AREA.l + (AREA.w - mapObj.width * s) / 2 + mapOff.x,
+          top: AREA.t + (AREA.h - mapObj.height * s) / 2 + mapOff.y,
+          selectable: mapEdit,
+          evented: mapEdit
+        });
+        mapObj.setCoords();
+      } else {
+        const r = new fabric.Rect({
+          width: AREA.w,
+          height: AREA.h,
+          fill: '#f4f4f4',
+          stroke: '#bbb',
+          strokeDashArray: [6, 4]
+        });
+
+        const t = new fabric.Text('Upload a map image to begin', {
+          fontSize: 16,
+          fontFamily: FONT,
+          fill: '#666',
+          originX: 'center',
+          originY: 'center',
+          left: AREA.w / 2,
+          top: AREA.h / 2
+        });
+
+        placeholder = add(new fabric.Group([r, t], {
+          left: AREA.l,
+          top: AREA.t
+        }));
+      }
+
+      stops().forEach(g => {
+        cv.bringToFront(g.arrowLine);
+        cv.bringToFront(g);
+        cv.bringToFront(g.arrowHandle);
+      });
+
+      notes().forEach(n => cv.bringToFront(n));
+
+      cv.requestRenderAll();
+    }
+
+    /* ---------- preview zoom ---------- */
+    const ZOOM_MIN = 0.1, ZOOM_MAX = 5;
+    let fitMode = true, userZoom = 1;
+
+    function stagePad() {
+      const cs = getComputedStyle($('stage'));
+      return {
+        x: parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight),
+        y: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+      };
+    }
+
+    function fitZoomValue() {
+      const stage = $('stage');
+      const pad = stagePad();
+      // available width comes from the wrapper (not the stage) because the
+      // preview panel itself is shrunk to the page width
+      const w = Math.max(100, $('previewWrap').clientWidth - 2 - pad.x);
+      const h = Math.max(100, stage.clientHeight - pad.y);
+      return Math.min(w / PW, h / PH);
+    }
+
+    function applyZoom(z) {
+      // Fit mode: make the preview panel only as wide as the page itself.
+      // Manual zoom: use the full width so the page can be scrolled.
+      if (fitMode) {
+        const need = Math.ceil(PW * z + stagePad().x + 2) + 1;
+        $('preview').style.width = Math.min($('previewWrap').clientWidth, need) + 'px';
+      } else {
+        $('preview').style.width = '100%';
+      }
+
+      cv.setZoom(z);
+      cv.setDimensions({ width: PW * z, height: PH * z });
+      cv.calcOffset();
+      cv.requestRenderAll();
+
+      $('zoomLabel').textContent = Math.round(z * 100) + '%';
+      $('zoomFitBtn').classList.toggle('active', fitMode);
+    }
+
+    // Re-applies the current zoom (fit mode re-fits to the available space).
+    function zoomFit() {
+      if (fitMode) userZoom = fitZoomValue();
+      userZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, userZoom));
+      applyZoom(userZoom);
+    }
+
+    function setZoom(z, anchor) {
+      const stage = $('stage');
+      const old = userZoom;
+      fitMode = false;
+      userZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+      applyZoom(userZoom);
+
+      // keep the point under the cursor (or the pane center) steady
+      const r = stage.getBoundingClientRect();
+      const ax = anchor ? anchor.x - r.left : stage.clientWidth / 2;
+      const ay = anchor ? anchor.y - r.top : stage.clientHeight / 2;
+      const k = userZoom / old;
+      stage.scrollLeft = (stage.scrollLeft + ax) * k - ax;
+      stage.scrollTop = (stage.scrollTop + ay) * k - ay;
+    }
+
+    function fitToPage() {
+      fitMode = true;
+      zoomFit();
+      $('stage').scrollLeft = 0;
+      $('stage').scrollTop = 0;
+    }
+
+    const ZOOM_STEP = 1.2;
+    $('zoomIn').onclick = () => setZoom(userZoom * ZOOM_STEP);
+    $('zoomOut').onclick = () => setZoom(userZoom / ZOOM_STEP);
+    $('zoomFitBtn').onclick = fitToPage;
+    $('zoom100').onclick = () => setZoom(1);
+
+    $('stage').addEventListener('wheel', e => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      setZoom(userZoom * Math.exp(-e.deltaY * 0.01), { x: e.clientX, y: e.clientY });
+    }, { passive: false });
+
+    // tf (optional) maps a point's fractional position on the old map to its
+    // position on the new map (used after cropping so arrows stay on their features).
+    function remap(o, n, tf) {
+      if (!o || !n || !o.w || !o.h) return;
+
+      const clamp01 = v => Math.min(1, Math.max(0, v));
+
+      const mapPt = (x, y) => {
+        let u = (x - o.l) / o.w;
+        let v = (y - o.t) / o.h;
+
+        if (tf) {
+          [u, v] = tf(u, v);
+          u = clamp01(u);
+          v = clamp01(v);
+        }
+
+        return [n.l + u * n.w, n.t + v * n.h];
+      };
+
+      stops().forEach(g => {
+        const h = g.arrowHandle;
+
+        let [gx, gy] = mapPt(g.left, g.top);
+
+        if (tf) {
+          gx = Math.max(n.l, Math.min(gx, n.l + n.w - g.getScaledWidth()));
+          gy = Math.max(n.t, Math.min(gy, n.t + n.h - g.getScaledHeight()));
+        }
+
+        const [hx, hy] = mapPt(h.left, h.top);
+
+        g.set({ left: gx, top: gy });
+        h.set({ left: hx, top: hy });
+
+        g.setCoords();
+        h.setCoords();
+        updateArrow(g);
+      });
+
+      cv.requestRenderAll();
+    }
+
+    function setPage() {
+      const o = mapRect();
+      const oldW = PW, oldH = PH;
+      calcPage();
+      mapOff = { x: 0, y: 0 };
+      layout();
+      remap(o, mapRect());
+      notes().forEach(n => {
+        n.set({
+          left: n.left * PW / oldW,
+          top: n.top * PH / oldH,
+          width: Math.min(n.width, PW - 2 * M)
+        });
+        n.setCoords();
+      });
+      zoomFit();
+    }
+
+    $('orient').onchange = setPage;
+    $('title').oninput = layout;
+
+    window.addEventListener('resize', zoomFit);
+
+    if ('ResizeObserver' in window) {
+      const stageObserver = new ResizeObserver(() => zoomFit());
+      stageObserver.observe($('stage'));
+      stageObserver.observe($('previewWrap'));
+    }
+
+    /* ---------- footer images ---------- */
+    let missingImgs = [], plainImgs = false;
+
+    function loadImage(src) {
+      return new Promise(resolve => {
+        const attempt = cors => {
+          const el = new Image();
+
+          if (cors) el.crossOrigin = 'anonymous';
+
+          el.onload = () => {
+            if (!cors) plainImgs = true;
+            resolve(el);
+          };
+
+          el.onerror = () => {
+            if (cors) return attempt(false);
+            missingImgs.push(src);
+            resolve(null);
+          };
+
+          el.src = src;
+        };
+
+        attempt(true);
+      });
+    }
+
+    const loadAll = srcs => Promise.all((srcs ?? []).map(loadImage));
+
+    function showImgNotice() {
+      const m = [];
+
+      if (missingImgs.length) {
+        m.push(
+          'Could not load: ' + missingImgs.join(', ') +
+          '. Check the file names, and that the files are in the "assets" folder next to this page.'
+        );
+      }
+
+      if (plainImgs) {
+        m.push(
+          'The footer images are showing, but the browser will block PDF download while this page is opened as a local file. Open it through a web server instead (for example, run "python3 -m http.server" in this folder).'
+        );
+      }
+
+      $('imgNotice').textContent = m.join(' ');
+      $('imgNotice').hidden = !m.length;
+    }
+
+    let mapSaturation = 100;
+
+    $('mapSaturation').addEventListener('input', function () {
+      mapSaturation = Number(this.value);
+
+      $('saturationValue').textContent = mapSaturation + '%';
+
+      applyMapSaturation();
+    });
+
+    function applyMapSaturation() {
+      if (!mapObj) return;
+
+      if (mapSaturation >= 100) {
+        mapObj.filters = [];
+      } else {
+        mapObj.filters = [
+          new fabric.Image.filters.Saturation({
+            saturation: mapSaturation / 100 - 1
+          })
+        ];
+      }
+
+      mapObj.applyFilters();
+      cv.requestRenderAll();
+    }
+
+    /* ---------- map ---------- */
+    function setMap(url, done, tf) {
+      const im = new Image();
+
+      im.onload = () => {
+        const o = mapRect();
+
+        if (mapObj) cv.remove(mapObj);
+
+        mapObj = new fabric.Image(im, FREEZE);
+        mapObj.set({
+          lockRotation: true,
+          lockUniScaling: true,
+          hoverCursor: 'move',
+          transparentCorners: false,
+          cornerColor: '#1a73e8',
+          cornerSize: 10,
+          borderColor: '#1a73e8',
+          borderDashArray: [5, 4]
+        });
+        mapObj.setControlsVisibility({ ml: false, mr: false, mt: false, mb: false, mtr: false });
+        cv.add(mapObj);
+        cv.sendToBack(mapObj);
+
+        $('saturationControl').style.display = 'block';
+        $('mapEditControls').style.display = 'block';
+        updateCropStatus();
+        applyMapSaturation();
+
+        layout();
+        remap(o, mapRect(), tf);
+
+        if (done) done();
+      };
+
+      im.src = url;
+    }
+
+    $('mapFile').onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const rd = new FileReader();
+
+      rd.onload = () => {
+        const im = new Image();
+
+        im.onload = () => {
+          const k = Math.min(1, 2200 / im.width);
+          const t = document.createElement('canvas');
+
+          t.width = Math.round(im.width * k);
+          t.height = Math.round(im.height * k);
+
+          t.getContext('2d').drawImage(im, 0, 0, t.width, t.height);
+          mapData = t.toDataURL('image/jpeg', 0.9);
+
+          // a new upload starts uncropped at full size
+          mapOriginal = mapData;
+          mapCrop = null;
+          mapScale = 100;
+          mapOff = { x: 0, y: 0 };
+          $('mapScale').value = 100;
+          $('mapScaleValue').textContent = '100%';
+
+          setMap(mapData);
+        };
+
+        im.src = rd.result;
+      };
+
+      rd.readAsDataURL(file);
+    };
+
+    /* ---------- crop & resize map ---------- */
+    function updateCropStatus() {
+      $('cropStatus').textContent = mapCrop
+        ? 'Cropped to ' + mapCrop.w + ' \u00d7 ' + mapCrop.h + ' px.'
+        : 'Showing the full map image.';
+    }
+
+    $('mapScale').addEventListener('input', function () {
+      const o = mapRect();
+
+      mapScale = Number(this.value);
+      $('mapScaleValue').textContent = mapScale + '%';
+
+      layout();
+      remap(o, mapRect());
+    });
+
+    const crop = { img: null, cr: null, ds: 1, ar: 0, drag: null };
+    const clampN = (v, a, b) => Math.min(b, Math.max(a, v));
+
+    function openCrop() {
+      if (!mapOriginal) return;
+
+      const im = new Image();
+
+      im.onload = () => {
+        crop.img = im;
+        crop.cr = mapCrop
+          ? { ...mapCrop }
+          : { x: 0, y: 0, w: im.naturalWidth, h: im.naturalHeight };
+        crop.ar = 0;
+
+        $('cropRatio').value = 'free';
+        $('cropImg').src = mapOriginal;
+        $('cropModal').hidden = false;
+
+        sizeCrop();
+        $('cropApply').focus();
+      };
+
+      im.src = mapOriginal;
+    }
+
+    function closeCrop() {
+      $('cropModal').hidden = true;
+      crop.drag = null;
+      $('cropBtn').focus();
+    }
+
+    function sizeCrop() {
+      if (!crop.img) return;
+
+      const nw = crop.img.naturalWidth;
+      const nh = crop.img.naturalHeight;
+      const availW = Math.max(200, Math.min(window.innerWidth - 80, 1100) - 40);
+      const availH = Math.max(160, window.innerHeight - 270);
+
+      crop.ds = Math.min(availW / nw, availH / nh, 1);
+
+      $('cropFrame').style.width = nw * crop.ds + 'px';
+      $('cropFrame').style.height = nh * crop.ds + 'px';
+
+      renderCrop();
+    }
+
+    function renderCrop() {
+      const b = $('cropBox').style;
+      const c = crop.cr;
+      const d = crop.ds;
+
+      b.left = c.x * d + 'px';
+      b.top = c.y * d + 'px';
+      b.width = c.w * d + 'px';
+      b.height = c.h * d + 'px';
+
+      $('cropInfo').textContent =
+        Math.round(c.w) + ' \u00d7 ' + Math.round(c.h) + ' px selected';
+    }
+
+    function resizeRect(dir, r0, dx, dy, W, H, ar) {
+      const MIN = 24;
+      let L = r0.x, R = r0.x + r0.w, T = r0.y, B = r0.y + r0.h;
+
+      if (dir.includes('w')) L = clampN(L + dx, 0, R - MIN);
+      if (dir.includes('e')) R = clampN(R + dx, L + MIN, W);
+      if (dir.includes('n')) T = clampN(T + dy, 0, B - MIN);
+      if (dir.includes('s')) B = clampN(B + dy, T + MIN, H);
+
+      if (ar) {
+        const hasX = dir.includes('w') || dir.includes('e');
+        const hasY = dir.includes('n') || dir.includes('s');
+        let w = R - L, h = B - T;
+
+        if (hasX && hasY) {
+          h = w / ar;
+          const maxH = dir.includes('n') ? B : H - T;
+          if (h > maxH) { h = maxH; w = h * ar; }
+          if (dir.includes('w')) L = R - w; else R = L + w;
+          if (dir.includes('n')) T = B - h; else B = T + h;
+        } else if (hasX) {
+          h = w / ar;
+          const cy = (T + B) / 2;
+          const maxH = 2 * Math.min(cy, H - cy);
+          if (h > maxH) { h = maxH; w = h * ar; }
+          if (dir.includes('w')) L = R - w; else R = L + w;
+          T = cy - h / 2;
+          B = cy + h / 2;
+        } else {
+          w = h * ar;
+          const cx = (L + R) / 2;
+          const maxW = 2 * Math.min(cx, W - cx);
+          if (w > maxW) { w = maxW; h = w / ar; }
+          if (dir.includes('n')) T = B - h; else B = T + h;
+          L = cx - w / 2;
+          R = cx + w / 2;
+        }
+      }
+
+      return { x: L, y: T, w: R - L, h: B - T };
+    }
+
+    (function wireCropBox() {
+      const box = $('cropBox');
+
+      box.addEventListener('pointerdown', e => {
+        const dir = e.target.dataset.h || 'move';
+        const d = crop.ds;
+        const c = crop.cr;
+
+        crop.drag = {
+          dir,
+          sx: e.clientX,
+          sy: e.clientY,
+          r0: { x: c.x * d, y: c.y * d, w: c.w * d, h: c.h * d }
+        };
+
+        box.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+
+      box.addEventListener('pointermove', e => {
+        const dr = crop.drag;
+        if (!dr) return;
+
+        const d = crop.ds;
+        const W = crop.img.naturalWidth * d;
+        const H = crop.img.naturalHeight * d;
+        const dx = e.clientX - dr.sx;
+        const dy = e.clientY - dr.sy;
+        let r;
+
+        if (dr.dir === 'move') {
+          r = {
+            x: clampN(dr.r0.x + dx, 0, W - dr.r0.w),
+            y: clampN(dr.r0.y + dy, 0, H - dr.r0.h),
+            w: dr.r0.w,
+            h: dr.r0.h
+          };
+        } else {
+          r = resizeRect(dr.dir, dr.r0, dx, dy, W, H, crop.ar);
+        }
+
+        crop.cr = { x: r.x / d, y: r.y / d, w: r.w / d, h: r.h / d };
+        renderCrop();
+      });
+
+      const end = () => { crop.drag = null; };
+      box.addEventListener('pointerup', end);
+      box.addEventListener('pointercancel', end);
+    })();
+
+    $('cropRatio').onchange = e => {
+      const v = e.target.value;
+
+      crop.ar = v === 'free' ? 0
+        : v === 'page' ? AREA.w / AREA.h
+        : Number(v);
+
+      if (!crop.ar) return;
+
+      // shrink the current selection to the chosen shape, keeping it centered
+      const c = crop.cr;
+      let w = c.w, h = c.h;
+
+      if (w / h > crop.ar) w = h * crop.ar; else h = w / crop.ar;
+
+      crop.cr = { x: c.x + (c.w - w) / 2, y: c.y + (c.h - h) / 2, w, h };
+      renderCrop();
+    };
+
+    $('cropReset').onclick = () => {
+      crop.cr = { x: 0, y: 0, w: crop.img.naturalWidth, h: crop.img.naturalHeight };
+      crop.ar = 0;
+      $('cropRatio').value = 'free';
+      renderCrop();
+    };
+
+    $('cropCancel').onclick = closeCrop;
+    $('cropBtn').onclick = openCrop;
+
+    $('cropApply').onclick = () => {
+      const im = crop.img;
+      const nw = im.naturalWidth;
+      const nh = im.naturalHeight;
+
+      const x = clampN(Math.round(crop.cr.x), 0, nw - 1);
+      const y = clampN(Math.round(crop.cr.y), 0, nh - 1);
+      const r = {
+        x,
+        y,
+        w: clampN(Math.round(crop.cr.w), 1, nw - x),
+        h: clampN(Math.round(crop.cr.h), 1, nh - y)
+      };
+
+      const prev = mapCrop || { x: 0, y: 0, w: nw, h: nh };
+
+      // keep stops and arrows attached to the same spots on the map
+      const tf = (u, v) => [
+        (prev.x + u * prev.w - r.x) / r.w,
+        (prev.y + v * prev.h - r.y) / r.h
+      ];
+
+      if (r.x === 0 && r.y === 0 && r.w === nw && r.h === nh) {
+        mapCrop = null;
+        mapData = mapOriginal;
+      } else {
+        const t = document.createElement('canvas');
+        t.width = r.w;
+        t.height = r.h;
+        t.getContext('2d').drawImage(im, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+
+        mapCrop = r;
+        mapData = t.toDataURL('image/jpeg', 0.92);
+      }
+
+      closeCrop();
+      setMap(mapData, null, tf);
+    };
+
+    /* ---------- rotate map ---------- */
+    // Transforms the uncropped original (and the crop region, if any) so the
+    // crop dialog, saved projects and the worksheet all stay consistent.
+    function transformMap(op) {
+      if (!mapOriginal) return;
+
+      const im = new Image();
+
+      im.onload = () => {
+        const W = im.naturalWidth;
+        const H = im.naturalHeight;
+        const swap = op === 'cw' || op === 'ccw';
+
+        const c = document.createElement('canvas');
+        c.width = swap ? H : W;
+        c.height = swap ? W : H;
+
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, c.width, c.height);
+
+        if (op === 'cw') { ctx.translate(H, 0); ctx.rotate(Math.PI / 2); }
+        else if (op === 'ccw') { ctx.translate(0, W); ctx.rotate(-Math.PI / 2); }
+
+        ctx.drawImage(im, 0, 0);
+
+        // where the crop region ends up in the transformed original
+        let r = null;
+        if (mapCrop) {
+          const { x, y, w, h } = mapCrop;
+          if (op === 'cw') r = { x: H - (y + h), y: x, w: h, h: w };
+          else r = { x: y, y: W - (x + w), w: h, h: w };
+        }
+
+        // fractional position on the displayed map -> same feature after transform
+        const tf =
+          op === 'cw' ? (u, v) => [1 - v, u]
+          : (u, v) => [v, 1 - u];
+
+        mapOriginal = c.toDataURL('image/jpeg', 0.95);
+        mapCrop = r;
+
+        if (r) {
+          const t = document.createElement('canvas');
+          t.width = r.w;
+          t.height = r.h;
+          t.getContext('2d').drawImage(c, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+          mapData = t.toDataURL('image/jpeg', 0.92);
+        } else {
+          mapData = mapOriginal;
+        }
+
+        setMap(mapData, null, tf);
+      };
+
+      im.src = mapOriginal;
+    }
+
+    document.querySelectorAll('[data-xform]').forEach(btn => {
+      btn.onclick = () => transformMap(btn.dataset.xform);
+    });
+
+    window.addEventListener('resize', () => {
+      if (!$('cropModal').hidden) sizeCrop();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !$('cropModal').hidden) closeCrop();
+    });
+
+    /* ---------- data fields ---------- */
+    function renderRecommended() {
+      const box = $('recommendedFields');
+      box.innerHTML = '';
+
+      RECOMMENDED_FIELDS.forEach(f => {
+        const lab = document.createElement('label');
+        lab.className = 'chk';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = recChecked.has(f);
+
+        cb.onchange = () => {
+          if (cb.checked) recChecked.add(f);
+          else recChecked.delete(f);
+          fieldsChanged();
+        };
+
+        lab.append(cb, document.createTextNode(f));
+        box.append(lab);
+      });
+    }
+
+    // Custom (non-recommended) fields appear as editable rows.
+    function renderFields() {
+      renderRecommended();
+
+      const box = $('fieldList');
+      box.innerHTML = '';
+
+      customFields.forEach((f, i) => {
+        const r = document.createElement('div');
+        r.className = 'row';
+
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = f;
+        inp.setAttribute('aria-label', 'Custom field ' + (i + 1));
+
+        inp.oninput = () => {
+          customFields[i] = inp.value;
+          fieldsChanged();
+        };
+
+        const x = document.createElement('button');
+        x.textContent = '\u00d7';
+        x.setAttribute('aria-label', 'Remove custom field ' + (i + 1));
+
+        x.onclick = () => {
+          customFields.splice(i, 1);
+          renderFields();
+        };
+
+        r.append(inp, x);
+        box.append(r);
+      });
+
+      renderPreview();
+    }
+
+    /* Add a blank custom field */
+    $('addField').onclick = () => {
+      customFields.push('');
+      renderFields();
+
+      const inputs = $('fieldList').querySelectorAll('input');
+      inputs[inputs.length - 1].focus();
+    };
+
+    /* ---------- checkbox labels ---------- */
+    function getCheckboxLabels() {
+      return {
+        indoor: $('indoorLabel').value.trim() || 'Indoor',
+        outdoor: $('outdoorLabel').value.trim() || 'Outdoor'
+      };
+    }
+
+    ['indoorLabel', 'outdoorLabel'].forEach(id => {
+      $(id).oninput = fieldsChanged;
+    });
+
+    // Field or label edits update the sample box right away; stops on the map
+    // are updated when the user clicks "Update all stop boxes".
+    function fieldsChanged() {
+      renderPreview();
+    }
+
+    $('updateAllStops').onclick = rebuildStops;
+
+    $('mapHelpBtn').onclick = () => {
+      const t = $('mapHelpText');
+      t.hidden = !t.hidden;
+      $('mapHelpBtn').setAttribute('aria-expanded', String(!t.hidden));
+    };
+
+    /* ---------- stop boxes ---------- */
+    function buildBox(name, fl, o = {}) {
+      const checkboxLabels = getCheckboxLabels();
+
+      const head = new fabric.Text(name, {
+        fontSize: 16,
+        fontWeight: 'bold',
+        fontFamily: FONT,
+        left: 10,
+        top: 7,
+        fill: '#16302b'
+      });
+
+      let w = Math.max(230, head.width + 20);
+
+      const labels = fl.map((f, i) => {
+        const t = new fabric.Text(f + ':', {
+          fontSize: 13,
+          fontFamily: FONT,
+          left: 10,
+          top: 68 + i * 28,
+          fill: '#222'
+        });
+
+        w = Math.max(w, t.width + 100);
+        return t;
+      });
+
+      const lines = labels.map(t =>
+        new fabric.Line([
+          t.left + t.width + 6,
+          t.top + 16,
+          w - 10,
+          t.top + 16
+        ], {
+          stroke: '#444',
+          strokeWidth: 1
+        })
+      );
+
+      const checkY = 40;
+      const checkboxSize = 12;
+      const checkboxGap = 5;
+      const groupGap = 20;
+
+      const indoorText = new fabric.Text(checkboxLabels.indoor, {
+        fontSize: 13,
+        fontFamily: FONT,
+        left: 10 + checkboxSize + checkboxGap,
+        top: checkY,
+        fill: '#222'
+      });
+
+      const indoorBox = new fabric.Rect({
+        left: 10,
+        top: checkY + 1,
+        width: checkboxSize,
+        height: checkboxSize,
+        fill: '#fff',
+        stroke: '#222',
+        strokeWidth: 1
+      });
+
+      const outdoorX =
+        indoorText.left + indoorText.width + groupGap;
+
+      const outdoorText = new fabric.Text(checkboxLabels.outdoor, {
+        fontSize: 13,
+        fontFamily: FONT,
+        left: outdoorX + checkboxSize + checkboxGap,
+        top: checkY,
+        fill: '#222'
+      });
+
+      const outdoorBox = new fabric.Rect({
+        left: outdoorX,
+        top: checkY + 1,
+        width: checkboxSize,
+        height: checkboxSize,
+        fill: '#fff',
+        stroke: '#222',
+        strokeWidth: 1
+      });
+
+      w = Math.max(
+        w,
+        outdoorText.left + outdoorText.width + 10
+      );
+
+      const h = 68 + fl.length * 28;
+
+      const bg = new fabric.Rect({
+        width: w,
+        height: h,
+        fill: '#fff',
+        stroke: '#16302b',
+        strokeWidth: 1.5
+      });
+
+      const bar = new fabric.Rect({
+        width: w,
+        height: 30,
+        fill: '#e0e0e0'
+      });
+
+      const g = new fabric.Group([
+        bg,
+        bar,
+        head,
+        ...labels,
+        ...lines,
+        indoorBox,
+        indoorText,
+        outdoorBox,
+        outdoorText
+      ], {
+        left: o.left,
+        top: o.top,
+        scaleX: o.scaleX,
+        scaleY: o.scaleY,
+        cornerColor: '#1d6b84',
+        cornerSize: 12,
+        transparentCorners: false
+      });
+
+      g.setControlsVisibility({ mtr: false });
+      g.stopName = name;
+      g.fl = fl.slice();
+      g.checkboxLabels = {
+        indoor: checkboxLabels.indoor,
+        outdoor: checkboxLabels.outdoor
+      };
+
+      return g;
+    }
+
+    const stops = () =>
+      cv.getObjects()
+        .filter(o => o.isStop)
+        .sort((a, b) => a.sid - b.sid);
+
+    const newName = () => {
+      const used = stops().map(g => g.stopName);
+      let n = 1;
+      while (used.includes('Stop ' + n)) n++;
+      return 'Stop ' + n;
+    };
+
+    const stopOf = o => o && (o.owner || (o.isStop ? o : null));
+    const selStop = () => stopOf(cv.getActiveObject());
+
+    /* ---------- arrows ---------- */
+    function updateArrow(g) {
+      const h = g.arrowHandle;
+      const l = g.arrowLine;
+      const len = 16;
+
+      if (!h.visible) {
+        l.set({ visible: false });
+        return;
+      }
+
+      h.set({ width: 12, height: len });
+
+      const c = g.getCenterPoint();
+      const hw = g.getScaledWidth() / 2;
+      const hh = g.getScaledHeight() / 2;
+      const dx = h.left - c.x;
+      const dy = h.top - c.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const ux = dx / dist;
+      const uy = dy / dist;
+
+      const s = Math.min(
+        hw / (Math.abs(dx) || 1e-6),
+        hh / (Math.abs(dy) || 1e-6)
+      );
+
+      h.set({
+        angle: Math.atan2(uy, ux) * 180 / Math.PI + 90
+      });
+
+      h.setCoords();
+
+      if (s >= 1) {
+        l.set({ visible: false });
+        return;
+      }
+
+      l.set({
+        visible: true,
+        x1: c.x + dx * s,
+        y1: c.y + dy * s,
+        x2: h.left - ux * len * 0.9,
+        y2: h.top - uy * len * 0.9,
+        strokeWidth: 2.5
+      });
+    }
+
+    function addStop(name, fl, o) {
+      o = Object.assign({}, o);
+
+      const k = stops().length;
+      const R = mapRect();
+
+      // Use the default fields when creating a stop without explicit fields.
+      fl = fl || getFields().filter(f => f.trim());
+
+      if (o.left == null) {
+        o.left = R.l + 20 + k * 24;
+        o.top = R.t + 20 + k * 24;
+      }
+
+      o.scaleX = o.scaleX || 0.8;
+      o.scaleY = o.scaleY || 0.8;
+
+      const g = buildBox(name || newName(), fl, o);
+
+      g.isStop = true;
+      g.sid = o.sid ?? ++lastSid;
+      lastSid = Math.max(lastSid, g.sid);
+
+      const line = new fabric.Line([0, 0, 0, 0], {
+        ...FREEZE,
+        stroke: ARROW,
+        strokeLineCap: 'round',
+        objectCaching: false
+      });
+
+      const tx = o.tx ?? g.left + g.getScaledWidth() / 2;
+      const ty = o.ty ?? g.top + g.getScaledHeight() + 50;
+
+      const head = new fabric.Triangle({
+        left: tx,
+        top: ty,
+        originX: 'center',
+        originY: 'top',
+        width: 12,
+        height: 16,
+        fill: ARROW,
+        strokeWidth: 0,
+        hasControls: false,
+        hasBorders: false,
+        padding: 8,
+        hoverCursor: 'move',
+        visible: o.arrow !== false
+      });
+
+      head.owner = g;
+      g.arrowHandle = head;
+      g.arrowLine = line;
+
+      cv.add(line, g, head);
+      updateArrow(g);
+      cv.setActiveObject(g);
+      cv.requestRenderAll();
+
+      renderStops();
+    }
+
+    const removeStop = g => cv.remove(g, g.arrowLine, g.arrowHandle);
+
+    $('addStop').onclick = () => addStop();
+
+    /* Right-click the map to add a stop whose arrowhead points at that spot.
+       The box is placed at a fixed offset below and to the right of the click;
+       the user can drag it wherever there is room. */
+    cv.upperCanvasEl.addEventListener('contextmenu', e => {
+      e.preventDefault();
+
+      if (!mapObj) return;
+
+      // ignore right-clicks on an existing box or arrowhead
+      const hit = cv.findTarget(e, false);
+      if (hit && hit !== mapObj) return;
+
+      const p = cv.getPointer(e);
+      const R = mapRect();
+
+      // only accept clicks that land on the map image
+      if (p.x < R.l || p.x > R.l + R.w || p.y < R.t || p.y > R.t + R.h) return;
+
+      LOG.count('stops_rightclick');
+      addStop(null, null, {
+        tx: p.x,
+        ty: p.y,
+        left: p.x + 30,
+        top: p.y + 50
+      });
+    });
+
+    function replaceSel(name, fl) {
+      const g = selStop();
+      if (!g) return;
+
+      const h = g.arrowHandle;
+
+      removeStop(g);
+
+      addStop(name, fl, {
+        sid: g.sid,
+        left: g.left,
+        top: g.top,
+        scaleX: g.scaleX,
+        scaleY: g.scaleY,
+        tx: h.left,
+        ty: h.top,
+        arrow: h.visible
+      });
+    }
+
+    // Rebuild every stop box with the current fields and checkbox labels,
+    // keeping each box's position, size, arrow and selection.
+    function rebuildStops() {
+      const list = stops();
+      if (!list.length) return;
+
+      const sel = selStop();
+      const fl = getFields().filter(f => f.trim());
+      let selNew = null;
+
+      list.forEach(g => {
+        const h = g.arrowHandle;
+        const o = {
+          sid: g.sid,
+          left: g.left,
+          top: g.top,
+          scaleX: g.scaleX,
+          scaleY: g.scaleY,
+          tx: h.left,
+          ty: h.top,
+          arrow: h.visible
+        };
+
+        removeStop(g);
+        addStop(g.stopName, fl, o);
+
+        if (g === sel) selNew = cv.getActiveObject();
+      });
+
+      if (selNew) cv.setActiveObject(selNew);
+      else cv.discardActiveObject();
+
+      cv.requestRenderAll();
+      syncSel();
+    }
+
+    $('arrowOn').onchange = e => {
+      const g = selStop();
+      if (!g) return;
+
+      g.arrowHandle.set('visible', e.target.checked);
+      cv.setActiveObject(g);
+      updateArrow(g);
+      cv.requestRenderAll();
+    };
+
+    function syncSel() {
+      const g = selStop();
+
+      $('sel').style.display = g ? 'block' : 'none';
+
+      if (g) $('arrowOn').checked = g.arrowHandle.visible;
+
+      [...$('stopList').children].forEach((r, i) => {
+        r.classList.toggle('sel', stops()[i] === g);
+      });
+    }
+
+    /* ---------- stop list ---------- */
+    function renderStops() {
+      const box = $('stopList');
+      const list = stops();
+
+      if (box.children.length !== list.length) {
+        box.innerHTML = '';
+
+        list.forEach((g, i) => {
+          const r = document.createElement('div');
+          r.className = 'row';
+
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.setAttribute('aria-label', 'Stop ' + (i + 1) + ' name');
+
+          inp.onfocus = () => {
+            const current = stops()[i];
+            if (!current) return;
+
+            cv.setActiveObject(current);
+            cv.requestRenderAll();
+          };
+
+          inp.onchange = () => {
+            const current = stops()[i];
+            if (!current) return;
+
+            cv.setActiveObject(current);
+            replaceSel(inp.value, current.fl);
+          };
+
+          const x = document.createElement('button');
+          x.textContent = '\u00d7';
+          x.setAttribute('aria-label', 'Remove stop ' + (i + 1));
+
+          x.onclick = () => {
+            const current = stops()[i];
+            if (!current) return;
+
+            removeStop(current);
+            cv.discardActiveObject();
+            renderStops();
+            cv.requestRenderAll();
+          };
+
+          r.append(inp, x);
+          box.append(r);
+        });
+      }
+
+      list.forEach((g, i) => {
+        box.children[i].firstChild.value = g.stopName;
+      });
+
+      renderPreview();
+      syncSel();
+    }
+
+    /* ---------- stop box preview ---------- */
+    function renderPreview() {
+      const NS = 'http://www.w3.org/2000/svg';
+      const fl = getFields().filter(f => f.trim());
+      const name = newName();
+      const checkboxLabels = getCheckboxLabels();
+
+      const ctx = renderPreview.ctx ||
+        (renderPreview.ctx = document.createElement('canvas').getContext('2d'));
+
+      const textW = (t, font) => {
+        ctx.font = font;
+        return ctx.measureText(t).width;
+      };
+
+      let w = Math.max(230, textW(name, 'bold 16px ' + FONT) + 20);
+
+      fl.forEach(f => {
+        w = Math.max(w, textW(f + ':', '13px ' + FONT) + 100);
+      });
+
+      const checkY = 40;
+      const checkboxSize = 12;
+      const checkboxGap = 5;
+      const groupGap = 20;
+
+      const indoorTextW = textW(checkboxLabels.indoor, '13px ' + FONT);
+      const outdoorTextW = textW(checkboxLabels.outdoor, '13px ' + FONT);
+
+      const outdoorX =
+        10 + checkboxSize + checkboxGap +
+        indoorTextW + groupGap;
+
+      w = Math.max(
+        w,
+        outdoorX + checkboxSize + checkboxGap + outdoorTextW + 10
+      );
+
+      const h = 68 + fl.length * 28;
+      const pad = 4;
+      const ARR = 56;
+      const cx = w / 2;
+
+      const svg = document.createElementNS(NS, 'svg');
+      const g = document.createElementNS(NS, 'g');
+
+      svg.setAttribute('viewBox', `0 0 ${w + 2 * pad} ${h + ARR + 2 * pad}`);
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', 'Preview of a stop box with checkboxes and an arrow');
+
+      g.setAttribute('transform', `translate(${pad} ${pad})`);
+      svg.append(g);
+
+      const mk = (tag, attrs, text) => {
+        const e = document.createElementNS(NS, tag);
+
+        for (const k in attrs) e.setAttribute(k, attrs[k]);
+
+        if (text != null) e.textContent = text;
+
+        g.append(e);
+      };
+
+      mk('rect', {
+        width: w,
+        height: h,
+        fill: '#fff',
+        stroke: '#16302b',
+        'stroke-width': 1.5
+      });
+
+      mk('rect', {
+        width: w,
+        height: 30,
+        fill: '#e0e0e0'
+      });
+
+      mk('text', {
+        x: 10,
+        y: 22,
+        'font-family': FONT,
+        'font-weight': 'bold',
+        'font-size': 16,
+        fill: '#16302b'
+      }, name);
+
+      fl.forEach((f, i) => {
+        const y = 68 + i * 28;
+
+        mk('text', {
+          x: 10,
+          y: y + 12,
+          'font-family': FONT,
+          'font-size': 13,
+          fill: '#222'
+        }, f + ':');
+
+        mk('line', {
+          x1: 10 + textW(f + ':', '13px ' + FONT) + 6,
+          y1: y + 16,
+          x2: w - 10,
+          y2: y + 16,
+          stroke: '#444'
+        });
+      });
+
+      mk('rect', {
+        x: 10,
+        y: checkY + 1,
+        width: checkboxSize,
+        height: checkboxSize,
+        fill: '#fff',
+        stroke: '#222'
+      });
+
+      mk('text', {
+        x: 10 + checkboxSize + checkboxGap,
+        y: checkY + 12,
+        'font-family': FONT,
+        'font-size': 13,
+        fill: '#222'
+      }, checkboxLabels.indoor);
+
+      mk('rect', {
+        x: outdoorX,
+        y: checkY + 1,
+        width: checkboxSize,
+        height: checkboxSize,
+        fill: '#fff',
+        stroke: '#222'
+      });
+
+      mk('text', {
+        x: outdoorX + checkboxSize + checkboxGap,
+        y: checkY + 12,
+        'font-family': FONT,
+        'font-size': 13,
+        fill: '#222'
+      }, checkboxLabels.outdoor);
+
+      mk('line', {
+        x1: cx,
+        y1: h,
+        x2: cx,
+        y2: h + ARR - 14,
+        stroke: ARROW,
+        'stroke-width': 2.5,
+        'stroke-linecap': 'round'
+      });
+
+      mk('polygon', {
+        points: `${cx - 6},${h + ARR - 16} ${cx + 6},${h + ARR - 16} ${cx},${h + ARR}`,
+        fill: ARROW
+      });
+
+      $('boxPreview').replaceChildren(svg);
+    }
+
+    cv.on({
+      'selection:created': syncSel,
+      'selection:updated': syncSel,
+      'selection:cleared': syncSel
+    });
+
+    ['object:moving', 'object:scaling', 'object:modified'].forEach(ev =>
+      cv.on(ev, e => {
+        const g = stopOf(e.target);
+        if (g) updateArrow(g);
+      })
+    );
+
+    /* ---------- step 3: text boxes + movable map ---------- */
+    const notes = () => cv.getObjects().filter(o => o.isNote);
+    const selNote = () => { const a = cv.getActiveObject(); return a && a.isNote ? a : null; };
+
+    function makeNote(o) {
+      o = Object.assign({}, o);
+
+      const t = new fabric.Textbox(o.text ?? 'Double-click to edit these instructions.', {
+        left: o.left ?? PW / 2 - 100,
+        top: o.top ?? PH / 2 - 20,
+        width: o.width ?? 200,
+        fontSize: o.fontSize ?? 11,
+        fontFamily: FONT,
+        fill: '#111',
+        backgroundColor: o.bg ?? '#ffffff',
+        lineHeight: 1.2,
+        lockRotation: true,
+        transparentCorners: false,
+        cornerColor: '#1a73e8',
+        cornerSize: 9,
+        borderColor: '#1a73e8',
+        padding: 4
+      });
+
+      t.isNote = true;
+
+      // height: the box is at least as tall as its text, and the user can
+      // drag the top/bottom handles to make it taller (minH)
+      t.minH = o.minH || 0;
+      t.calcTextHeight = function () {
+        return Math.max(fabric.Textbox.prototype.calcTextHeight.call(this), this.minH || 0);
+      };
+      // fill the whole box (not just the text) with the chosen color
+      t._renderBackground = function (ctx) {
+        if (!this.backgroundColor) return;
+        ctx.fillStyle = this.backgroundColor;
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+      };
+      t.initDimensions();
+      t.setControlsVisibility({ mtr: false });
+      cv.add(t);
+      cv.bringToFront(t);
+      return t;
+    }
+
+    function syncNoteUI() {
+      const n = selNote();
+      $('noteSel').style.display = n ? 'block' : 'none';
+      if (!n) return;
+
+      // snap the dropdown to the nearest preset
+      const opts = [...$('noteSize').options].map(x => Number(x.value));
+      const near = opts.reduce((a, b) => Math.abs(b - n.fontSize) < Math.abs(a - n.fontSize) ? b : a);
+      $('noteSize').value = near;
+      $('noteBg').value = n.backgroundColor || '#ffffff';
+    }
+
+    $('addNote').onclick = () => {
+      const n = makeNote({ text: '' });
+      n.set('text', 'Type your instructions here.');
+      cv.setActiveObject(n);
+      n.enterEditing();
+      n.selectAll();
+      cv.requestRenderAll();
+      syncNoteUI();
+    };
+
+    // every handle resizes the box itself (width and height) instead of stretching the text
+    function bakeNoteScale(n) {
+      if (n.scaleX === 1 && n.scaleY === 1) return;
+      n.set({
+        width: Math.max(40, n.width * n.scaleX),
+        minH: Math.max(0, n.height * n.scaleY),
+        scaleX: 1,
+        scaleY: 1
+      });
+      n.initDimensions();
+      n.dirty = true; // force the cached drawing (color + text) to be redrawn at the new height
+      n.setCoords();
+    }
+    cv.on('object:scaling', e => { if (e.target && e.target.isNote) bakeNoteScale(e.target); });
+    cv.on('object:modified', e => { if (e.target && e.target.isNote) bakeNoteScale(e.target); });
+
+    $('noteSize').onchange = () => {
+      const n = selNote();
+      if (!n) return;
+      n.set('fontSize', Number($('noteSize').value));
+      n.setCoords();
+      cv.requestRenderAll();
+    };
+
+    $('noteBg').oninput = () => {
+      const n = selNote();
+      if (!n) return;
+      n.set('backgroundColor', $('noteBg').value);
+      cv.requestRenderAll();
+    };
+
+    $('noteDup').onclick = () => {
+      const n = selNote();
+      if (!n) return;
+      const c = makeNote({ text: n.text, left: n.left + 14, top: n.top + 14, width: n.width, minH: n.minH, fontSize: n.fontSize, bg: n.backgroundColor });
+      cv.setActiveObject(c);
+      syncNoteUI();
+      cv.requestRenderAll();
+    };
+
+    function deleteNote() {
+      const n = selNote();
+      if (!n) return;
+      cv.discardActiveObject();
+      cv.remove(n);
+      cv.requestRenderAll();
+      syncNoteUI();
+    }
+    $('noteDel').onclick = deleteNote;
+
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName)) return;
+      const n = selNote();
+      if (n && !n.isEditing) { e.preventDefault(); deleteNote(); }
+    });
+
+    // a text box left empty is removed when the user finishes editing
+    cv.on('text:editing:exited', e => {
+      const t = e.target;
+      if (t && t.isNote && !t.text.trim()) { cv.remove(t); cv.requestRenderAll(); syncNoteUI(); }
+    });
+
+    ['selection:created', 'selection:updated', 'selection:cleared'].forEach(ev => cv.on(ev, syncNoteUI));
+
+    // map edit mode
+    $('mapEditOn').onchange = function () {
+      mapEdit = this.checked;
+      if (mapObj) {
+        mapObj.set({ selectable: mapEdit, evented: mapEdit });
+        if (!mapEdit && cv.getActiveObject() === mapObj) cv.discardActiveObject();
+        else if (mapEdit) cv.setActiveObject(mapObj);
+        mapObj.setCoords();
+        cv.requestRenderAll();
+      }
+    };
+
+    $('mapReset').onclick = () => {
+      if (!mapObj) return;
+      const o = mapRect();
+      mapOff = { x: 0, y: 0 };
+      layout();
+      remap(o, mapRect());
+    };
+
+    // dragging / resizing the map carries the stops and arrows with it
+    cv.on('mouse:down', e => { if (e.target === mapObj) lastMapRect = mapRect(); });
+
+    ['object:moving', 'object:scaling'].forEach(ev =>
+      cv.on(ev, e => {
+        if (e.target !== mapObj || !lastMapRect) return;
+        const n = mapRect();
+        remap(lastMapRect, n);
+        lastMapRect = n;
+      })
+    );
+
+    cv.on('object:modified', e => {
+      if (e.target !== mapObj || !lastMapRect) return;
+
+      const fit = Math.min(AREA.w / mapObj.width, AREA.h / mapObj.height);
+      const o = lastMapRect;
+
+      mapScale = clampN(Math.round(mapObj.scaleX / fit * 100), 30, 100);
+      $('mapScale').value = mapScale;
+      $('mapScaleValue').textContent = mapScale + '%';
+
+      const s = fit * mapScale / 100;
+      mapOff = {
+        x: mapObj.left - (AREA.l + (AREA.w - mapObj.width * s) / 2),
+        y: mapObj.top - (AREA.t + (AREA.h - mapObj.height * s) / 2)
+      };
+
+      layout();
+      remap(o, mapRect());
+      lastMapRect = null;
+    });
+
+    /* ---------- PDF export ---------- */
+    $('pdf').onclick = () => {
+      const _t0 = performance.now();
+      cv.discardActiveObject();
+
+      if (placeholder) placeholder.set('visible', false);
+
+      cv.setZoom(1);
+      cv.setDimensions({ width: PW, height: PH });
+
+      let img = null;
+
+      try {
+        img = cv.toDataURL({
+          format: 'jpeg',
+          quality: 0.92,
+          multiplier: 3
+        });
+      } catch (e) {}
+
+      if (placeholder) placeholder.set('visible', true);
+
+      zoomFit();
+
+      if (!img) {
+        LOG.exportEvent('pdf', false, { error: 'footer_images_blocked' });
+        return alert(
+          'The PDF could not be created because the browser blocked the footer images. Open this page through a web server instead of as a local file.'
+        );
+      }
+
+      const pdf = new window.jspdf.jsPDF({
+        orientation: PW >= PH ? 'l' : 'p',
+        unit: 'pt',
+        format: [PW, PH]
+      });
+
+      pdf.addImage(img, 'JPEG', 0, 0, PW, PH);
+      pdf.save(fileSlug() + '.pdf');
+      LOG.exportEvent('pdf', true, { pdf_ms: Math.round(performance.now() - _t0) });
+    };
+
+    /* ---------- dataset template XLSX export ---------- */
+    // Uses ExcelJS (SheetJS community edition cannot write dropdown lists).
+    $('datasetTemplate').onclick = async () => {
+      if (typeof ExcelJS === 'undefined') {
+        alert(
+          'The Excel export library could not be loaded. ' +
+          'Check your internet connection and reload the page.'
+        );
+        LOG.exportEvent('template', false, { error: 'exceljs_not_loaded' });
+        return;
+      }
+
+      const currentStops = stops();
+
+      const dataFields = [
+        ...new Set(getFields().map(f => f.trim()).filter(Boolean))
+      ];
+
+      // Indoor / Outdoor labels become the dropdown options of one column.
+      const labels = getCheckboxLabels();
+      const options = [
+        ...new Set(
+          [labels.indoor, labels.outdoor].map(v => v.replace(/[,"]/g, ' ').trim())
+        )
+      ];
+
+      const headers = ['Stop', ...dataFields, 'Location Type'];
+      const locCol = headers.length;
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Dataset Template', {
+        views: [{ state: 'frozen', xSplit: 1, ySplit: 1 }]
+      });
+
+      sheet.addRow(headers).font = { bold: true };
+      currentStops.forEach(stop => sheet.addRow([stop.stopName]));
+
+      headers.forEach((header, index) => {
+        sheet.getColumn(index + 1).width = Math.min(
+          35,
+          Math.max(index === 0 ? 12 : 15, String(header).length + 3)
+        );
+      });
+
+      // Dropdown on every stop row, plus spare rows for stops added later.
+      const lastRow = Math.max(currentStops.length + 1, 100);
+
+      for (let r = 2; r <= lastRow; r++) {
+        sheet.getCell(r, locCol).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: ['"' + options.join(',') + '"'],
+          showErrorMessage: true,
+          errorStyle: 'error',
+          errorTitle: 'Location Type',
+          error: 'Please choose ' + options.join(' or ') + '.'
+        };
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }));
+      a.download = fileSlug() + '-Dataset-Template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      LOG.exportEvent('template', true, { template_rows: currentStops.length, template_cols: headers.length });
+    };
+
+    /* ---------- save / load ---------- */
+    $('save').onclick = () => {
+      const data = {
+        projectId: LOG.projectId(),
+        savedAt: new Date().toISOString(),
+        appVersion: LOG.version,
+        map: mapData,
+        mapOriginal: mapOriginal !== mapData ? mapOriginal : null,
+        mapCrop: mapCrop,
+        mapScale: mapScale,
+        mapOff: mapOff,
+        notes: notes().map(n => ({
+          text: n.text,
+          left: n.left,
+          top: n.top,
+          width: n.width * n.scaleX,
+          minH: n.minH || 0,
+          fontSize: n.fontSize * n.scaleY,
+          bg: n.backgroundColor
+        })),
+        mapSaturation: mapSaturation,
+        title: $('title').value,
+        fields: getFields(),
+        indoorLabel: $('indoorLabel').value,
+        outdoorLabel: $('outdoorLabel').value,
+        orient: $('orient').value,
+
+        stops: stops().map(g => ({
+          name: g.stopName,
+          fl: g.fl,
+          left: g.left,
+          top: g.top,
+          scaleX: g.scaleX,
+          scaleY: g.scaleY,
+          tx: g.arrowHandle.left,
+          ty: g.arrowHandle.top,
+          arrow: g.arrowHandle.visible,
+          checkboxLabels: g.checkboxLabels
+        }))
+      };
+
+      const json = JSON.stringify(data);
+      const a = document.createElement('a');
+
+      a.href = URL.createObjectURL(
+        new Blob([json], { type: 'application/json' })
+      );
+
+      a.download = fileSlug() + '-project.json';
+      a.click();
+
+      URL.revokeObjectURL(a.href);
+      LOG.exportEvent('save', true, { save_kb: Math.round(json.length / 102.4) / 10 });
+    };
+
+    $('loadBtn').onclick = () => $('loadFile').click();
+
+    $('loadFile').onchange = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+
+      let upLogged = false;
+
+      f.text().then(t => {
+        const d = JSON.parse(t);
+        LOG.draftParsed(d, f.size);
+
+        $('title').value = d.title || '';
+
+        $('indoorLabel').value = d.indoorLabel || 'Indoor';
+        $('outdoorLabel').value = d.outdoorLabel || 'Outdoor';
+
+        if (d.orient) $('orient').value = d.orient;
+
+        mapOriginal = d.mapOriginal || d.map || null;
+        mapCrop = d.mapCrop || null;
+        mapScale = d.mapScale ?? 100;
+        mapOff = d.mapOff || { x: 0, y: 0 };
+        notes().forEach(n => cv.remove(n));
+        $('mapScale').value = mapScale;
+        $('mapScaleValue').textContent = mapScale + '%';
+
+        mapSaturation = d.mapSaturation ?? 100;
+        $('mapSaturation').value = mapSaturation;
+        $('saturationValue').textContent = mapSaturation + '%';
+
+        // Restore fields from a saved project: recommended ones become
+        // checked boxes, everything else is a custom field. If the project
+        // has no fields, use the defaults.
+        const loadedFields = Array.isArray(d.fields)
+          ? d.fields
+          : [...DEFAULT_FIELDS];
+
+        recChecked = new Set(
+          loadedFields.map(f => f.trim()).filter(f => RECOMMENDED_FIELDS.includes(f))
+        );
+        customFields = loadedFields.filter(f => !RECOMMENDED_FIELDS.includes(f.trim()));
+
+        renderFields();
+
+        stops().forEach(removeStop);
+        cv.discardActiveObject();
+        renderStops();
+
+        lastSid = 0;
+
+        calcPage();
+        layout();
+        zoomFit();
+
+        const place = () => {
+          (d.stops || []).forEach(s => {
+            const savedLabels = s.checkboxLabels || {
+              indoor: $('indoorLabel').value || 'Indoor',
+              outdoor: $('outdoorLabel').value || 'Outdoor'
+            };
+
+            const currentLabels = getCheckboxLabels();
+
+            $('indoorLabel').value = savedLabels.indoor || currentLabels.indoor;
+            $('outdoorLabel').value = savedLabels.outdoor || currentLabels.outdoor;
+
+            // Use saved stop fields when available; otherwise use current fields.
+            addStop(
+              s.name,
+              Array.isArray(s.fl) ? s.fl : getFields().filter(f => f.trim()),
+              s
+            );
+          });
+
+          $('indoorLabel').value = d.indoorLabel || 'Indoor';
+          $('outdoorLabel').value = d.outdoorLabel || 'Outdoor';
+
+          renderPreview();
+
+          (d.notes || []).forEach(n => makeNote(n));
+          cv.requestRenderAll();
+
+          // snapshot of the restored draft = what the user starts from
+          upLogged = true;
+          LOG.uploadEvent(true, { upload_kb: Math.round(f.size / 102.4) / 10 });
+        };
+
+        if (d.map) {
+          mapData = d.map;
+          setMap(d.map, place);
+        } else {
+          mapData = null;
+          mapOriginal = null;
+          mapCrop = null;
+          $('mapEditControls').style.display = 'none';
+          $('saturationControl').style.display = 'none';
+
+          if (mapObj) {
+            cv.remove(mapObj);
+            mapObj = null;
+            layout();
+            zoomFit();
+          }
+
+          place();
+        }
+      }).catch(err => {
+        if (!upLogged) {
+          upLogged = true;
+          LOG.uploadEvent(false, {
+            upload_kb: Math.round(f.size / 102.4) / 10,
+            error: String((err && err.message) || err).slice(0, 200)
+          });
+        }
+        alert('That file could not be opened as a worksheet project.');
+      });
+
+      e.target.value = '';
+    };
+
+    const sidePane = document.querySelector('aside');
+
+    /* ---------- adjustable left / right pane width ---------- */
+    (function () {
+      const main = document.querySelector('main');
+      const sp = $('splitter');
+      const DEFAULT_W = 600, MIN_LEFT = 260, MIN_RIGHT = 320;
+      let leftW = DEFAULT_W;
+
+      const maxLeft = () => {
+        const cs = getComputedStyle(main);
+        const inner = main.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        return Math.max(MIN_LEFT, inner - sp.offsetWidth - MIN_RIGHT);
+      };
+
+      const setLeft = v => {
+        leftW = Math.round(clampN(v, MIN_LEFT, maxLeft()));
+        main.style.setProperty('--leftW', leftW + 'px');
+        sp.setAttribute('aria-valuenow', leftW);
+      };
+
+      sp.setAttribute('aria-valuemin', MIN_LEFT);
+
+      sp.addEventListener('pointerdown', e => {
+        sp.setPointerCapture(e.pointerId);
+        sp.classList.add('dragging');
+        document.body.classList.add('resizing');
+        e.preventDefault();
+      });
+
+      sp.addEventListener('pointermove', e => {
+        if (!sp.hasPointerCapture(e.pointerId)) return;
+        const left = sidePane.getBoundingClientRect().left;
+        setLeft(e.clientX - left - sp.offsetWidth / 2);
+      });
+
+      const end = e => {
+        if (sp.hasPointerCapture(e.pointerId)) sp.releasePointerCapture(e.pointerId);
+        sp.classList.remove('dragging');
+        document.body.classList.remove('resizing');
+      };
+      sp.addEventListener('pointerup', end);
+      sp.addEventListener('pointercancel', end);
+
+      sp.addEventListener('dblclick', () => setLeft(DEFAULT_W));
+
+      sp.addEventListener('keydown', e => {
+        if (e.key === 'ArrowLeft') setLeft(leftW - 20);
+        else if (e.key === 'ArrowRight') setLeft(leftW + 20);
+        else if (e.key === 'Home') setLeft(DEFAULT_W);
+        else return;
+        e.preventDefault();
+      });
+
+      window.addEventListener('resize', () => setLeft(leftW));
+      setLeft(leftW);
+    })();
+
+    /* ---------- left pane scroll cue ---------- */
+    const updateScrollCue = () =>
+      sidePane.classList.toggle(
+        'at-end',
+        sidePane.scrollTop + sidePane.clientHeight >= sidePane.scrollHeight - 4
+      );
+    sidePane.addEventListener('scroll', updateScrollCue);
+    // collapsing/expanding a step changes the scroll height
+    sidePane.addEventListener('toggle', updateScrollCue, true);
+    window.addEventListener('resize', updateScrollCue);
+    updateScrollCue();
+
+    /* ---------- usage logging (events are received by server.py) ----------
+       Data is organised by STEP ID, never by step number, so steps can be
+       added, removed or reordered without breaking old data:
+         - every <details class="step"> has data-step="some_id" (if missing, an id is
+           made from its heading text, ignoring the leading number)
+         - STEP_SNAPSHOTS below has one entry per step id; its keys become columns
+           named  <step_id>__<metric>   (for example  layout_map__title)
+         - never reuse an id for a different meaning; give a changed step a new id */
+    const LOG = (() => {
+      const VERSION = '1.1.0';
+      const SCHEMA = 2;
+      const ENDPOINT = 'log';   // relative URL, handled by server.py
+      const DEFAULT_NOTE_TEXTS = ['Type your instructions here.', 'Double-click to edit these instructions.'];
+
+      const uid = () => {
+        try { if (crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+        return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+      };
+
+      // anonymous, random browser ID (no personal data) to recognise repeat users
+      let clientId = null;
+      try {
+        clientId = localStorage.getItem('wsClientId');
+        if (!clientId) { clientId = uid(); localStorage.setItem('wsClientId', clientId); }
+      } catch (e) { clientId = clientId || uid(); }
+
+      const ua = navigator.userAgent;
+      const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
+        : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Other';
+      const os = /Windows/.test(ua) ? 'Windows' : /iPhone|iPad|iPod/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android'
+        : /Mac OS X/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : 'Other';
+
+      const t0 = Date.now();
+      const S = {
+        sessionId: uid(),
+        projectId: uid(),      // replaced by the draft's projectId when a draft is opened
+        interacted: false,
+        draft: null,
+        lastSaveAt: null,
+        c: {
+          map_uploads: 0, rotate: 0, crop_applies: 0,
+          update_all: 0, stops_rightclick: 0, stops_button: 0,
+          notes_added: 0, note_dups: 0, notes_deleted: 0, map_resets: 0, map_edit_used: 0,
+          pdf: 0, template: 0, save: 0
+        }
+      };
+
+      /* ----- steps: stable ids, and time each panel is open ----- */
+      const side = document.querySelector('aside');
+      const stepEls = Array.from(document.querySelectorAll('aside details.step'));
+      const slug = t => String(t || '').replace(/^\s*\d+\.\s*/, '').replace(/^optional:\s*/i, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+      const stepIds = [];
+      stepEls.forEach(el => {
+        let id = (el.dataset && el.dataset.step) || '';
+        if (!id) {
+          const s = el.querySelector('summary');
+          id = slug(s && s.textContent) || 'unnamed_step';
+          console.warn('usage logging: step without data-step, using "' + id + '"');
+        }
+        let u = id, n = 2;
+        while (stepIds.includes(u)) u = id + '_' + n++;
+        stepIds.push(u);
+      });
+      const stepMs = stepEls.map(() => 0);
+      const stepSince = stepEls.map(el => (el.open ? Date.now() : null));
+      const stepOrder = [];
+      side.addEventListener('toggle', e => {
+        const i = stepEls.indexOf(e.target);
+        if (i < 0) return;
+        if (e.target.open) {
+          stepSince[i] = Date.now();
+          if (stepOrder[stepOrder.length - 1] !== stepIds[i] && stepOrder.length < 40) stepOrder.push(stepIds[i]);
+        } else if (stepSince[i] != null) {
+          stepMs[i] += Date.now() - stepSince[i];
+          stepSince[i] = null;
+        }
+      }, true);
+
+      /* ----- interaction flag and per-action counters ----- */
+      const mark = () => { S.interacted = true; };
+      document.addEventListener('input', mark, true);
+      document.addEventListener('change', mark, true);
+      side.addEventListener('click', e => { if (e.target.closest && e.target.closest('button')) mark(); });
+
+      const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+      on('mapFile', 'change', e => { if (e.target.files && e.target.files[0]) S.c.map_uploads++; });
+      document.querySelectorAll('[data-xform]').forEach(b => b.addEventListener('click', () => S.c.rotate++));
+      on('cropApply', 'click', () => S.c.crop_applies++);
+      on('updateAllStops', 'click', () => S.c.update_all++);
+      on('addStop', 'click', () => S.c.stops_button++);
+      on('addNote', 'click', () => S.c.notes_added++);
+      on('noteDup', 'click', () => S.c.note_dups++);
+      on('noteDel', 'click', () => S.c.notes_deleted++);
+      on('mapReset', 'click', () => S.c.map_resets++);
+      on('mapEditOn', 'change', e => { if (e.target.checked) S.c.map_edit_used = 1; });
+
+      /* ----- shared readers ----- */
+      const fieldList = () => [...new Set(getFields().map(f => f.trim()).filter(Boolean))];
+
+      const stopRows = () => {
+        const fields = fieldList();
+        return stops().map((g, i) => {
+          const fl = (g.fl || []).map(x => String(x).trim()).filter(Boolean);
+          return {
+            step: 'stop_data',
+            stop_index: i + 1,
+            name_is_default: /^Stop \d+$/.test(g.stopName || ''),
+            name_length: (g.stopName || '').length,
+            field_count: fl.length,
+            has_arrow: !!(g.arrowHandle && g.arrowHandle.visible),
+            fields_in_sync: fl.length === fields.length && fl.every((x, j) => x === fields[j])
+          };
+        });
+      };
+
+      const noteRows = () => notes().map((n, i) => ({
+        step: 'instructions',
+        note_index: i + 1,
+        font_size: Math.round((n.fontSize || 0) * (n.scaleY || 1)),
+        bg_color: String(n.backgroundColor || '').toLowerCase(),
+        text_length: (n.text || '').length,
+        is_default_text: DEFAULT_NOTE_TEXTS.includes(n.text)
+      }));
+
+      const fieldRows = () => fieldList().map(f => ({
+        step: 'stop_data', field_name: f, is_recommended: RECOMMENDED_FIELDS.includes(f)
+      }));
+
+      /* ----- one entry per step id: what is configured there -----
+         Keys become columns  <step_id>__<key>.  Each entry runs on its own, so a
+         step whose controls were removed from the page is skipped without
+         affecting the others. */
+      const STEP_SNAPSHOTS = {
+        open_project: () => {
+          const d = S.draft;
+          return {
+            loaded_draft: !!d,
+            loaded_after_sec: d ? d.after_sec : null,
+            draft_stops: d ? d.stops : null,
+            draft_fields: d ? d.fields : null,
+            draft_notes: d ? d.notes : null,
+            draft_has_map: d ? d.has_map : null,
+            draft_age_days: d ? d.age_days : null
+          };
+        },
+
+        layout_map: () => ({
+          title: $('title').value,
+          title_set: $('title').value.trim() !== '',
+          orientation: $('orient').value,
+          orientation_changed: $('orient').value !== 'landscape',
+          has_map: !!mapData,
+          map_img_w: mapObj ? Math.round(mapObj.width) : null,
+          map_img_h: mapObj ? Math.round(mapObj.height) : null,
+          map_cropped: !!mapCrop,
+          crop_w: mapCrop ? mapCrop.w : null,
+          crop_h: mapCrop ? mapCrop.h : null,
+          map_scale_pct: mapScale,
+          saturation_pct: mapSaturation,
+          map_uploads: S.c.map_uploads,
+          rotate_clicks: S.c.rotate,
+          crop_applies: S.c.crop_applies
+        }),
+
+        stop_data: () => {
+          const fields = fieldList();
+          const custom = fields.filter(f => !RECOMMENDED_FIELDS.includes(f));
+          const defSet = new Set(DEFAULT_FIELDS);
+          const indoor = $('indoorLabel').value.trim();
+          const outdoor = $('outdoorLabel').value.trim();
+          const rows = stopRows();
+          const out = {
+            num_fields: fields.length,
+            fields: fields.join(';'),
+            fields_changed_from_default: fields.length !== defSet.size || fields.some(f => !defSet.has(f)),
+            num_custom_fields: custom.length,
+            custom_fields: custom.join(';'),
+            indoor_label: indoor,
+            outdoor_label: outdoor,
+            labels_customized: indoor !== 'Indoor' || outdoor !== 'Outdoor',
+            num_stops: rows.length,
+            stops_with_arrow: rows.filter(s => s.has_arrow).length,
+            stops_out_of_sync: rows.filter(s => !s.fields_in_sync).length,
+            update_all_clicks: S.c.update_all,
+            stops_added_rightclick: S.c.stops_rightclick,
+            stops_added_button: S.c.stops_button
+          };
+          RECOMMENDED_FIELDS.forEach(f => { out['field_' + f.replace(/\s+/g, '_')] = recChecked.has(f); });
+          return out;
+        },
+
+        instructions: () => {
+          const rows = noteRows();
+          const moved = Math.abs(mapOff.x) > 0.5 || Math.abs(mapOff.y) > 0.5;
+          return {
+            used: rows.length > 0 || moved || S.c.map_edit_used > 0 || S.c.notes_added > 0,
+            num_notes: rows.length,
+            note_sizes: rows.map(n => n.font_size).join(';'),
+            note_custom_bg_count: rows.filter(n => n.bg_color !== '#ffffff').length,
+            avg_note_text_len: rows.length ? Math.round(rows.reduce((a, n) => a + n.text_length, 0) / rows.length) : null,
+            notes_default_text: rows.filter(n => n.is_default_text).length,
+            map_moved: moved,
+            map_off_x: Math.round(mapOff.x),
+            map_off_y: Math.round(mapOff.y),
+            map_edit_used: S.c.map_edit_used > 0,
+            notes_added: S.c.notes_added,
+            note_duplicates: S.c.note_dups,
+            note_delete_clicks: S.c.notes_deleted,
+            map_reset_clicks: S.c.map_resets
+          };
+        },
+
+        export: () => ({
+          pdf_count: S.c.pdf,
+          template_count: S.c.template,
+          save_count: S.c.save
+        })
+      };
+
+      // add a step id as a prefix to metric names
+      const P = (id, o) => {
+        const r = {};
+        Object.keys(o || {}).forEach(k => { r[id + '__' + k] = o[k]; });
+        return r;
+      };
+
+      function send(rec, beacon) {
+        try {
+          const body = JSON.stringify(rec);
+          if (beacon && navigator.sendBeacon) {
+            navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain' }));
+          } else {
+            fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body, keepalive: true })
+              .catch(() => {});
+          }
+        } catch (e) {}
+      }
+
+      const safe = fn => { try { return fn(); } catch (e) { return []; } };
+
+      // never throws: logging must not break the tool
+      function event(type, extra, beacon) {
+        try {
+          const flat = {};
+          Object.keys(STEP_SNAPSHOTS).forEach(id => {
+            try { Object.assign(flat, P(id, STEP_SNAPSHOTS[id]())); }
+            catch (e) { console.warn('usage logging: step "' + id + '" skipped', e); }
+          });
+          const now = Date.now();
+          stepIds.forEach((id, i) => {
+            flat[id + '__open_sec'] = Math.round((stepMs[i] + (stepSince[i] != null ? now - stepSince[i] : 0)) / 1000);
+          });
+
+          send(Object.assign({
+            event_type: type,
+            timestamp_utc: new Date().toISOString(),
+            schema_version: SCHEMA,
+            session_id: S.sessionId,
+            client_id: clientId,
+            project_id: S.projectId,
+            app_version: VERSION,
+            sec_since_session_start: Math.round((now - t0) / 1000),
+            browser, os,
+            viewport_w: window.innerWidth,
+            viewport_h: window.innerHeight,
+            any_interaction: S.interacted,
+            page_steps: stepIds.join('>'),          // step order on the page at this time
+            step_order_opened: stepOrder.join('>')  // order the user opened them
+          }, flat, extra || {}, {
+            fields_detail: safe(fieldRows),
+            stops_detail: safe(stopRows),
+            notes_detail: safe(noteRows)
+          }), beacon);
+        } catch (e) { console.warn('usage logging failed', e); }
+      }
+
+      // kind: 'pdf' | 'template' | 'save'; extra keys are plain metric names
+      function exportEvent(kind, ok, extra) {
+        try {
+          const now = Date.now();
+          const e = { action: kind, success: ok };
+          if (ok) {
+            if (kind === 'save') {
+              e.seconds_since_last_save = S.lastSaveAt ? Math.round((now - S.lastSaveAt) / 1000) : null;
+              e.save_after_draft_load = !!S.draft;
+              S.lastSaveAt = now;
+            }
+            S.c[kind]++;
+          }
+          event({ pdf: 'pdf_download', template: 'dataset_template_download', save: 'project_save' }[kind],
+            P('export', Object.assign(e, extra || {})));
+        } catch (err) { console.warn('usage logging failed', err); }
+      }
+
+      function uploadEvent(ok, extra) {
+        event('project_upload', P('open_project', Object.assign({ upload_ok: ok }, extra || {})));
+      }
+
+      function draftParsed(d, bytes) {
+        try {
+          const saved = d && d.savedAt ? Date.parse(d.savedAt) : NaN;
+          S.draft = {
+            after_sec: Math.round((Date.now() - t0) / 1000),
+            stops: Array.isArray(d.stops) ? d.stops.length : 0,
+            fields: Array.isArray(d.fields) ? d.fields.length : null,
+            notes: Array.isArray(d.notes) ? d.notes.length : 0,
+            has_map: !!d.map,
+            age_days: isNaN(saved) ? null : Math.max(0, Math.round((Date.now() - saved) / 864e4) / 10)
+          };
+          if (d && d.projectId) S.projectId = String(d.projectId);
+        } catch (e) {}
+      }
+
+      let ended = false;
+      window.addEventListener('pagehide', () => {
+        if (ended) return;
+        ended = true;
+        event('session_end', {}, true);
+      });
+      window.addEventListener('pageshow', e => { if (e.persisted) ended = false; });
+
+      return {
+        version: VERSION,
+        event, exportEvent, uploadEvent, draftParsed,
+        projectId: () => S.projectId,
+        count: k => { S.c[k] = (S.c[k] || 0) + 1; S.interacted = true; }
+      };
+    })();
+
+    /* ---------- start ---------- */
+    // The default recommended fields start checked on page load.
+    renderFields();
+    calcPage();
+    layout();
+
+    requestAnimationFrame(zoomFit);
+
+    loadAll(TEMPLATE.footerImages).then(h => {
+      footerEls = h.filter(Boolean);
+
+      const o = mapRect();
+      layout();
+      remap(o, mapRect());
+      zoomFit();
+      showImgNotice();
+    });
+  </script>
+</body>
+
+</html>
