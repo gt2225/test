@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Place-based Data Collection Tool</title>
+  <title>Place-based Data Collection Assets Tool</title>
   <style>
     :root {
       --bg: #fff;
@@ -12,9 +12,10 @@
       --ink: #16302b;
       --mute: #5b706b;
       --line: #c9d8d4;
-      --step-bg: #e4f1fa;
-      --step-line: #b5d2e5;
-      --accent: #1d6b84;
+      --step-bg: #ddf0fb;
+      --step-line: #b5daf0;
+      --accent: #4a1530;
+      --accent-hover: #6a2045;
       --accent-ink: #fff;
       --danger: #a33a2c;
     }
@@ -27,16 +28,15 @@
     body {
       margin: 0;
       width: 100%;
-      height: 100%;
+      min-height: 100%;
     }
 
     body {
       background: var(--bg);
       color: var(--ink);
       font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      overflow-x: hidden;
+      overflow-y: auto;
     }
 
     header {
@@ -45,8 +45,6 @@
       max-width: 1300px;
       margin: 0 auto;
       padding: 10px 24px 0;
-      overflow-y: auto;
-      max-height: 30vh;
     }
 
     h1 {
@@ -60,68 +58,63 @@
       max-width: 70ch;
     }
 
+    header p.intro {
+      margin-top: 8px;
+      color: var(--ink);
+      font-size: 14px;
+      max-width: 120ch;
+    }
+
+    header p.intro.tip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: fit-content;
+      max-width: 100%;
+      margin: 12px 0 28px;
+      padding: 8px 14px;
+      background: var(--step-bg);
+      border: 1px solid var(--step-line);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      font-size: 13.5px;
+    }
+
+    header p.intro.tip .tip-label {
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    header p.intro.tip a {
+      color: var(--accent);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    header p.intro.tip a:hover {
+      color: var(--accent-hover);
+    }
+
     main {
       display: grid;
       grid-template-columns: var(--leftW, 600px) 18px minmax(0, 1fr);
       gap: 0;
       max-width: 1300px;
-      flex: 1 1 0;
       width: 100%;
-      min-height: 0;
       margin: 0 auto;
-      padding: 8px 24px 20px;
-      align-items: stretch;
-      overflow: hidden;
+      padding: 8px 24px 40px;
+      align-items: start;
     }
 
     aside {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      min-height: 0;
-      height: 100%;
-      overflow-y: scroll !important;
-      overflow-x: hidden;
-      overscroll-behavior: contain;
-      scrollbar-gutter: stable;
       padding: 0 6px 16px 0;
-    }
-
-    /* Fade at the bottom edge signals more content below (works in all browsers) */
-    aside::after {
-      content: "";
-      display: block;
-      flex-shrink: 0;
-      position: sticky;
-      bottom: -16px;
-      height: 36px;
-      margin-top: -48px;
-      pointer-events: none;
-      background: linear-gradient(rgba(255, 244, 179, 0), #c1c1c1 85%);
-      transition: opacity .2s;
-    }
-
-    aside.at-end::after {
-      opacity: 0;
-    }
-
-    aside::-webkit-scrollbar {
-      width: 12px;
-    }
-
-    aside::-webkit-scrollbar-track {
-      background: #e8efed;
-      border-radius: 6px;
-    }
-
-    aside::-webkit-scrollbar-thumb {
-      background: #78918b;
-      border: 2px solid #e8efed;
-      border-radius: 6px;
-    }
-
-    aside::-webkit-scrollbar-thumb:hover {
-      background: #1d6b84;
     }
 
     /* Wrapper takes the grid column; #preview inside it is shrunk to the
@@ -130,8 +123,10 @@
       display: flex;
       justify-content: center;
       min-width: 0;
-      min-height: 0;
-      height: 100%;
+      position: sticky;
+      top: 8px;
+      height: calc(100vh - 16px);
+      min-height: 480px;
     }
 
     #preview {
@@ -163,13 +158,11 @@
     #zoomBar button {
       padding: 4px 10px;
       min-width: 34px;
-      background: #fff;
-      color: var(--accent);
     }
 
+    /* same plum style; a ring marks the active mode */
     #zoomBar button.active {
-      background: var(--accent);
-      color: var(--accent-ink);
+      box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent);
     }
 
     #zoomLabel {
@@ -217,11 +210,17 @@
       flex-shrink: 0;
     }
 
-    /* each numbered step gets a light blue box */
+    /* each step gets its own light pastel color */
     details.step {
       background: var(--step-bg);
       border-color: var(--step-line);
     }
+
+    details.step[data-step="open_project"] { --step-bg: #e9e1fa; --step-line: #cfc0ee; }
+    details.step[data-step="layout_map"] { --step-bg: #ddf0fb; --step-line: #b5daf0; }
+    details.step[data-step="stop_data"] { --step-bg: #ddf5e6; --step-line: #b4e3c8; }
+    details.step[data-step="instructions"] { --step-bg: #fff5cc; --step-line: #f0e09a; }
+    details.step[data-step="export"] { --step-bg: #ffe5d4; --step-line: #f7c8a8; }
 
     /* field configuration on the left, live box preview on the right (wraps below when the pane is narrow) */
     .cfg-row {
@@ -257,6 +256,7 @@
 
     /* draggable divider between the left and right panes */
     #splitter {
+      align-self: stretch;
       position: relative;
       display: flex;
       align-items: center;
@@ -329,23 +329,46 @@
       padding: 2px 0;
     }
 
-    /* round accent badge with a chevron: clearly a toggle */
-    details.step > summary::after {
+    /* round plum badge with a chevron, top right; shown only while the step is collapsed
+       (when open, the collapse button at the bottom right takes over) */
+    details.step > summary::after,
+    .collapse-btn {
       content: "";
       flex-shrink: 0;
       width: 28px;
       height: 28px;
       border-radius: 50%;
       background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / 18px no-repeat;
-      transition: transform .2s;
-    }
-
-    details.step > summary:hover::after {
-      filter: brightness(1.15);
     }
 
     details.step[open] > summary::after {
-      transform: rotate(180deg);
+      display: none;
+    }
+
+    details.step > summary:hover::after,
+    .collapse-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    /* bottom-right collapse button, shown only while the step is open */
+    .step-foot {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+
+    .collapse-btn {
+      display: block;
+      padding: 0;
+      border: 0;
+      cursor: pointer;
+    }
+
+    .collapse-btn {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 15l6-6 6 6'/%3E%3C/svg%3E");
+      background-position: center;
+      background-size: 18px;
+      background-repeat: no-repeat;
     }
 
     details.step[open] > summary {
@@ -402,13 +425,14 @@
     }
 
     button:hover {
-      filter: brightness(1.12);
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
     }
 
     button:focus-visible,
     input:focus-visible,
     select:focus-visible {
-      outline: 3px solid #7fc4d8;
+      outline: 3px solid #c58aae;
       outline-offset: 1px;
     }
 
@@ -431,7 +455,7 @@
 
     .row.sel input {
       border-color: var(--accent);
-      background: #eef6f9;
+      background: #f6ecf2;
     }
 
     .two {
@@ -493,13 +517,6 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      background: #fff;
-      color: var(--accent);
-    }
-
-    button.secondary {
-      background: #fff;
-      color: var(--accent);
     }
 
     /* ---------- crop modal ---------- */
@@ -614,6 +631,7 @@
       main {
         display: flex;
         flex-direction: column;
+        align-items: stretch;
         height: auto;
         min-height: 0;
         overflow: visible;
@@ -633,6 +651,7 @@
       }
 
       #previewWrap {
+        position: static;
         height: 75vh;
         min-height: 300px;
         width: 100%;
@@ -667,7 +686,14 @@
 
 <body>
   <header>
-    <h1>Place-based Data Collection Tool</h1>
+    <h1>Place-based Data Collection Assets Tool</h1>
+    <p class="intro"><strong>📊 Great data stories start with meaningful data</strong></p>
+    <p class="intro"><i>So how about we turn our communities into a rich data source? What if learning Data Visualization became a fun outdoor excursion? 🌳🚶</i></p>
+    <p class="intro">As the facilitator, you can use this tool to build map-based student worksheets and assets that take data collection out of the classroom and guide students to specific places around them 📍</p>
+    <p class="intro">At each stop, students record data and note interesting observations. Back in the classroom, they use their worksheets to build a dataset. It can go beyond what they collected - they can transform the collected data or derive new columns from it. Then they visualize and analyze it in tools like Tableau to tell a story with data and make a meaningful impact in their community 📈</p>
+    <p class="intro"></p>
+    <p class="intro">Get started with the steps below to build your Place-based Data Collection assets 🚀</p>
+    <p class="intro tip"><span class="tip-label">💡</span><span>Explore a pre-configured sample collection of assets for the <strong>Piedmont Park</strong> in Atlanta to preview what you can create: <a href="#" id="viewSample">View sample →</a></span></p>
     <p id="imgNotice" class="hint" style="color: var(--danger)" hidden></p>
   </header>
 
@@ -678,6 +704,7 @@
         <p class="hint">Continue a worksheet you saved earlier, or skip this and start a new one with step 1.</p>
         <button id="loadBtn">Open Project</button>
         <input type="file" id="loadFile" accept=".json" hidden>
+        <div class="step-foot"><button type="button" class="collapse-btn" aria-label="Collapse this step" title="Collapse this step"></button></div>
       </details>
 
       <details class="step" data-step="layout_map">
@@ -741,6 +768,7 @@
             <span>Fill the page</span>
           </div>
         </div>
+        <div class="step-foot"><button type="button" class="collapse-btn" aria-label="Collapse this step" title="Collapse this step"></button></div>
       </details>
 
       <details class="step" data-step="stop_data">
@@ -795,6 +823,7 @@
             Show arrow to map location for the selected stop
           </label>
         </div>
+        <div class="step-foot"><button type="button" class="collapse-btn" aria-label="Collapse this step" title="Collapse this step"></button></div>
       </details>
 
       <details class="step" data-step="instructions">
@@ -806,6 +835,8 @@
           <button id="addNote" type="button">Add a text box</button>
         </div>
         <p class="hint">Drag a box to move it, drag its corners to resize it, and double-click it to edit the text. Add as many as you need.</p>
+        <p class="hint">Give each box a title below to tell them apart while you work. Titles are only for you and never appear on the worksheet.</p>
+        <div id="noteList" style="margin-top:10px;"></div>
         <div id="noteSel" style="display:none; margin-top:8px;">
           <label class="f" for="noteSize">Text size for the selected box</label>
           <select id="noteSize">
@@ -829,8 +860,9 @@
         </label>
         <p class="hint">When checked, drag the map to move it and drag a corner to resize it. Stops and arrows move with the map. Uncheck it to go back to placing stops.</p>
         <div class="btns">
-          <button id="mapReset" type="button" class="secondary">Reset map position</button>
+          <button id="mapReset" type="button" class="secondary">Reset Map Position &amp; Size</button>
         </div>
+        <div class="step-foot"><button type="button" class="collapse-btn" aria-label="Collapse this step" title="Collapse this step"></button></div>
       </details>
 
       <details class="step" data-step="export">
@@ -841,6 +873,7 @@
           <button id="datasetTemplate">Download Dataset Template</button>
           <button id="save">Save Project</button>
         </div>
+        <div class="step-foot"><button type="button" class="collapse-btn" aria-label="Collapse this step" title="Collapse this step"></button></div>
       </details>
     </aside>
 
@@ -874,7 +907,7 @@
         <label for="cropRatio">Shape:</label>
         <select id="cropRatio">
           <option value="free">Free</option>
-          <option value="page">Match the page's map area</option>
+          <option value="page" selected>Match the page's map area</option>
           <option value="1">Square (1:1)</option>
           <option value="1.3333">4:3</option>
           <option value="1.7778">16:9</option>
@@ -917,6 +950,20 @@
     };
 
     const $ = id => document.getElementById(id);
+
+    // Emojis shown on the stop boxes (display only: stored field names and exports are unchanged).
+    const STOP_EMOJI = '\u{1F4CD}'; // pin
+    const FIELD_EMOJI = {
+      'AQI': '\u{1F32B}\uFE0F',
+      'AQS': '\u{1F32B}\uFE0F',
+      'Temperature': '\u{1F321}\uFE0F',
+      'Step Count': '\u{1F463}',
+      'Timestamp': '\u{1F552}',
+      'Interesting Data': '\u2728'
+    };
+    const CUSTOM_EMOJI = '\u{1F4DD}';
+    const stopTitle = name => STOP_EMOJI + ' ' + name;
+    const fieldLabel = f => (FIELD_EMOJI[f.trim()] || CUSTOM_EMOJI) + ' ' + f + ':';
 
     // Worksheet name with spaces turned into hyphens, for exported file names.
     function fileSlug() {
@@ -1472,7 +1519,9 @@
           : { x: 0, y: 0, w: im.naturalWidth, h: im.naturalHeight };
         crop.ar = 0;
 
-        $('cropRatio').value = 'free';
+        // default shape: match the page's map area (shrinks the selection to that shape)
+        $('cropRatio').value = 'page';
+        $('cropRatio').onchange({ target: $('cropRatio') });
         $('cropImg').src = mapOriginal;
         $('cropModal').hidden = false;
 
@@ -1849,7 +1898,7 @@
     function buildBox(name, fl, o = {}) {
       const checkboxLabels = getCheckboxLabels();
 
-      const head = new fabric.Text(name, {
+      const head = new fabric.Text(stopTitle(name), {
         fontSize: 16,
         fontWeight: 'bold',
         fontFamily: FONT,
@@ -1861,7 +1910,7 @@
       let w = Math.max(230, head.width + 20);
 
       const labels = fl.map((f, i) => {
-        const t = new fabric.Text(f + ':', {
+        const t = new fabric.Text(fieldLabel(f), {
           fontSize: 13,
           fontFamily: FONT,
           left: 10,
@@ -2288,10 +2337,10 @@
         return ctx.measureText(t).width;
       };
 
-      let w = Math.max(230, textW(name, 'bold 16px ' + FONT) + 20);
+      let w = Math.max(230, textW(stopTitle(name), 'bold 16px ' + FONT) + 20);
 
       fl.forEach(f => {
-        w = Math.max(w, textW(f + ':', '13px ' + FONT) + 100);
+        w = Math.max(w, textW(fieldLabel(f), '13px ' + FONT) + 100);
       });
 
       const checkY = 40;
@@ -2357,7 +2406,7 @@
         'font-weight': 'bold',
         'font-size': 16,
         fill: '#16302b'
-      }, name);
+      }, stopTitle(name));
 
       fl.forEach((f, i) => {
         const y = 68 + i * 28;
@@ -2368,10 +2417,10 @@
           'font-family': FONT,
           'font-size': 13,
           fill: '#222'
-        }, f + ':');
+        }, fieldLabel(f));
 
         mk('line', {
-          x1: 10 + textW(f + ':', '13px ' + FONT) + 6,
+          x1: 10 + textW(fieldLabel(f), '13px ' + FONT) + 6,
           y1: y + 16,
           x2: w - 10,
           y2: y + 16,
@@ -2446,6 +2495,14 @@
 
     /* ---------- step 3: text boxes + movable map ---------- */
     const notes = () => cv.getObjects().filter(o => o.isNote);
+    let lastNid = 0;
+    const noteItems = () => notes().sort((a, b) => a.nid - b.nid);
+    const newNoteTitle = () => {
+      const used = notes().map(n => n.title);
+      let k = 1;
+      while (used.includes('Text box ' + k)) k++;
+      return 'Text box ' + k;
+    };
     const selNote = () => { const a = cv.getActiveObject(); return a && a.isNote ? a : null; };
 
     function makeNote(o) {
@@ -2469,6 +2526,9 @@
       });
 
       t.isNote = true;
+      t.nid = ++lastNid;
+      // title is only for the list in step 3; it is never drawn on the canvas or worksheet
+      t.title = o.title ?? newNoteTitle();
 
       // height: the box is at least as tall as its text, and the user can
       // drag the top/bottom handles to make it taller (minH)
@@ -2489,7 +2549,56 @@
       return t;
     }
 
+    /* list of text boxes, with an editable title for each (same idea as the stop list) */
+    function renderNotes() {
+      const box = $('noteList');
+      const list = noteItems();
+      const key = list.map(n => n.nid).join(',');
+
+      if (box.dataset.key !== key) {
+        box.dataset.key = key;
+        box.innerHTML = '';
+
+        list.forEach((n, i) => {
+          const r = document.createElement('div');
+          r.className = 'row';
+
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.placeholder = 'Title (not shown on the worksheet)';
+          inp.setAttribute('aria-label', 'Text box ' + (i + 1) + ' title');
+          inp.value = n.title || '';
+
+          inp.onfocus = () => {
+            cv.setActiveObject(n);
+            cv.requestRenderAll();
+          };
+
+          inp.oninput = () => { n.title = inp.value; };
+
+          const x = document.createElement('button');
+          x.type = 'button';
+          x.textContent = '\u00d7';
+          x.setAttribute('aria-label', 'Remove text box ' + (i + 1));
+
+          x.onclick = () => {
+            cv.discardActiveObject();
+            cv.remove(n);
+            cv.requestRenderAll();
+            syncNoteUI();
+          };
+
+          r.append(inp, x);
+          box.append(r);
+        });
+      }
+
+      const sel = selNote();
+      [...box.children].forEach((r, i) => r.classList.toggle('sel', list[i] === sel));
+    }
+
     function syncNoteUI() {
+      renderNotes();
       const n = selNote();
       $('noteSel').style.display = n ? 'block' : 'none';
       if (!n) return;
@@ -2502,7 +2611,8 @@
     }
 
     $('addNote').onclick = () => {
-      const n = makeNote({ text: '' });
+      // starts tall enough to be easy to spot on the page (about 4x a one-line box)
+      const n = makeNote({ text: '', minH: 60 });
       n.set('text', 'Type your instructions here.');
       cv.setActiveObject(n);
       n.enterEditing();
@@ -2545,7 +2655,7 @@
     $('noteDup').onclick = () => {
       const n = selNote();
       if (!n) return;
-      const c = makeNote({ text: n.text, left: n.left + 14, top: n.top + 14, width: n.width, minH: n.minH, fontSize: n.fontSize, bg: n.backgroundColor });
+      const c = makeNote({ title: (n.title || 'Text box') + ' copy', text: n.text, left: n.left + 14, top: n.top + 14, width: n.width, minH: n.minH, fontSize: n.fontSize, bg: n.backgroundColor });
       cv.setActiveObject(c);
       syncNoteUI();
       cv.requestRenderAll();
@@ -2592,6 +2702,9 @@
       if (!mapObj) return;
       const o = mapRect();
       mapOff = { x: 0, y: 0 };
+      mapScale = 100;
+      $('mapScale').value = 100;
+      $('mapScaleValue').textContent = '100%';
       layout();
       remap(o, mapRect());
     };
@@ -2755,7 +2868,8 @@
         mapCrop: mapCrop,
         mapScale: mapScale,
         mapOff: mapOff,
-        notes: notes().map(n => ({
+        notes: noteItems().map(n => ({
+          title: n.title,
           text: n.text,
           left: n.left,
           top: n.top,
@@ -2801,15 +2915,17 @@
 
     $('loadBtn').onclick = () => $('loadFile').click();
 
-    $('loadFile').onchange = e => {
-      const f = e.target.files[0];
-      if (!f) return;
-
+    /* Shared loader: used by "Open Project" (a file the user picks) and by
+       "View sample" (a JSON file stored next to this page). Both just hand it
+       a promise that resolves to the project JSON text. */
+    function loadProjectText(textPromise, fileSize) {
       let upLogged = false;
+      let size = fileSize || 0;
 
-      f.text().then(t => {
+      textPromise.then(t => {
         const d = JSON.parse(t);
-        LOG.draftParsed(d, f.size);
+        size = fileSize || t.length;
+        LOG.draftParsed(d, size);
 
         $('title').value = d.title || '';
 
@@ -2823,6 +2939,7 @@
         mapScale = d.mapScale ?? 100;
         mapOff = d.mapOff || { x: 0, y: 0 };
         notes().forEach(n => cv.remove(n));
+        renderNotes();
         $('mapScale').value = mapScale;
         $('mapScaleValue').textContent = mapScale + '%';
 
@@ -2880,11 +2997,12 @@
           renderPreview();
 
           (d.notes || []).forEach(n => makeNote(n));
+          renderNotes();
           cv.requestRenderAll();
 
           // snapshot of the restored draft = what the user starts from
           upLogged = true;
-          LOG.uploadEvent(true, { upload_kb: Math.round(f.size / 102.4) / 10 });
+          LOG.uploadEvent(true, { upload_kb: Math.round(size / 102.4) / 10 });
         };
 
         if (d.map) {
@@ -2910,17 +3028,49 @@
         if (!upLogged) {
           upLogged = true;
           LOG.uploadEvent(false, {
-            upload_kb: Math.round(f.size / 102.4) / 10,
+            upload_kb: Math.round(size / 102.4) / 10,
             error: String((err && err.message) || err).slice(0, 200)
           });
         }
         alert('That file could not be opened as a worksheet project.');
       });
+    }
 
+    $('loadFile').onchange = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      loadProjectText(f.text(), f.size);
       e.target.value = '';
     };
 
+    /* ---------- sample projects ----------
+       Each sample is a project file saved from this tool (Save Project),
+       stored alongside this page. Add more here if you ever want them. */
+    const SAMPLES = {
+      piedmont_park: 'samples/piedmont-park-project.json'
+    };
+
+    $('viewSample').onclick = e => {
+      e.preventDefault();
+      if (stops().length && !confirm('Loading the sample will replace your current worksheet. Continue?')) return;
+      loadProjectText(
+        fetch(SAMPLES.piedmont_park).then(r => {
+          if (!r.ok) throw new Error('Sample not found (' + r.status + ')');
+          return r.text();
+        })
+      );
+    };
+
     const sidePane = document.querySelector('aside');
+
+    /* bottom-right collapse buttons close their step and keep its header in view */
+    sidePane.addEventListener('click', e => {
+      const b = e.target.closest && e.target.closest('.collapse-btn');
+      if (!b) return;
+      const d = b.closest('details.step');
+      d.open = false;
+      d.scrollIntoView({ block: 'nearest' });
+    });
 
     /* ---------- adjustable left / right pane width ---------- */
     (function () {
@@ -3027,6 +3177,7 @@
         sessionId: uid(),
         projectId: uid(),      // replaced by the draft's projectId when a draft is opened
         interacted: false,
+        dirty: false,          // changes made since the last successful export
         draft: null,
         lastSaveAt: null,
         c: {
@@ -3070,10 +3221,13 @@
       }, true);
 
       /* ----- interaction flag and per-action counters ----- */
-      const mark = () => { S.interacted = true; };
+      const mark = () => { S.interacted = true; S.dirty = true; };
       document.addEventListener('input', mark, true);
       document.addEventListener('change', mark, true);
       side.addEventListener('click', e => { if (e.target.closest && e.target.closest('button')) mark(); });
+      // edits made directly on the page canvas (moving the map, stops or notes)
+      cv.on('object:modified', mark);
+      cv.on('text:editing:exited', mark);
 
       const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
       on('mapFile', 'change', e => { if (e.target.files && e.target.files[0]) S.c.map_uploads++; });
@@ -3279,6 +3433,7 @@
               S.lastSaveAt = now;
             }
             S.c[kind]++;
+            setTimeout(() => { S.dirty = false; }, 0);
           }
           event({ pdf: 'pdf_download', template: 'dataset_template_download', save: 'project_save' }[kind],
             P('export', Object.assign(e, extra || {})));
@@ -3316,9 +3471,19 @@
         version: VERSION,
         event, exportEvent, uploadEvent, draftParsed,
         projectId: () => S.projectId,
+        // true when something has changed since the last successful export (or ever, if never exported)
+        hasUnexportedWork: () => S.dirty,
         count: k => { S.c[k] = (S.c[k] || 0) + 1; S.interacted = true; }
       };
     })();
+
+    /* ---------- confirm before leaving without exporting ---------- */
+    // Browsers show their own generic "Leave site?" dialog; custom text is ignored.
+    window.addEventListener('beforeunload', e => {
+      if (!LOG.hasUnexportedWork()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
 
     /* ---------- start ---------- */
     // The default recommended fields start checked on page load.
